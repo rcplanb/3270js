@@ -7,3 +7,5 @@ export { OIA_GLYPHS, OIA_GLYPH_SIZE } from './oia-glyphs.js';
 export type { OiaGlyph } from './oia-glyphs.js';
 export { oiaCells, oiaDescription } from './oia-layout.js';
 export type { OiaCell, OiaLayoutOptions } from './oia-layout.js';
+export { DEFAULT_KEYMAP, KeyboardMapper, comboOf } from './keymap.js';
+export type { KeyBinding, Keymap, KeyboardMapperOptions } from './keymap.js';
