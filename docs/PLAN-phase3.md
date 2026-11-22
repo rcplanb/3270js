@@ -86,7 +86,7 @@ Each task is one PR.
 
 ### 3270js: the library side (→ Checkpoint H)
 
-- [ ] **0. `SessionObserver`: the passive copy**
+- [x] **0. `SessionObserver`: the passive copy**
   - Acceptance:
     - A headless class fed raw bytes from both directions (`host(chunk)`, `terminal(chunk)`).
     - It follows the telnet and TN3270E negotiation, BIND, UNBIND, SSCP-LU and Outbound 3270DS, with the same logic as the trace recorder, which is then rebuilt on it.
@@ -102,6 +102,12 @@ Each task is one PR.
   - Verify:
     - Every recorded trace (TK5 colour and models 2–5, OS/390 TN3270E) is fed through both a `SessionObserver` and a real `Terminal`; the screens must match after every record.
     - The redaction tests from #47 also run against the observer.
+  - Done:
+    - `src/core/observer/`, exported from `3270js` (ESM and CJS).
+    - `ready` needs `timers` (`{ setTimeout, clearTimeout }`) from the embedder, because the core is platform-neutral and may not touch `globalThis`.
+    - The keyboard lock is the host's view: an operator's AID locks it, and a restoring write (or the first write) unlocks it. Host-requested replies don't lock it.
+    - The trace recorder is now built on the observer, so there's one redaction path.
+    - Equivalence: all 9 recorded traces (TK5 mono, colour and models 2–5; OS/390 TN3270E; synthetic) match `Terminal` cell for cell after every host record.
 
 - [ ] **1. Screen recognisers and readiness**
   - Acceptance:
