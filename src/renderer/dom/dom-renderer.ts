@@ -96,6 +96,16 @@ export class DomRenderer implements Renderer {
     return { width: rect.width / 10, height: row.height };
   }
 
+  cellAt(clientX: number, clientY: number): { row: number; col: number } | undefined {
+    const m = this.cellMetrics;
+    if (!m) return undefined;
+    const rect = this.#screenEl.getBoundingClientRect();
+    const col = Math.floor((clientX - rect.left) / m.width);
+    const row = Math.floor((clientY - rect.top) / m.height);
+    if (row < 0 || row >= this.#rows.length || col < 0 || col >= this.#cols) return undefined;
+    return { row, col };
+  }
+
   attach(terminal: Terminal): void {
     this.detach();
     this.#term = terminal;
