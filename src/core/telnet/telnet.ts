@@ -79,6 +79,11 @@ export type TelnetEvent =
   | { type: 'send'; data: Uint8Array }
   | { type: 'option'; side: TelnetSide; option: number; enabled: boolean }
   | { type: 'mode'; in3270: boolean; tn3270e: boolean }
+  /**
+   * Plain TN3270: the host refused the LU asked for with `type@LU` by asking
+   * for the terminal type again (RFC 1646). The session can't continue.
+   */
+  | { type: 'luRefused'; luName: string }
   /** TN3270E negotiation finished: what the host assigned and agreed. */
   | { type: 'tn3270e'; deviceType: string; luName?: string; functions: number[] }
   /** A protocol problem; the session has recovered and carries on. */
@@ -91,6 +96,12 @@ export interface TelnetSessionOptions {
   maxRecordLength?: number;
   /** Accept TN3270E (RFC 2355). Omit to refuse it, as a plain TN3270 client. */
   tn3270e?: Tn3270eOptions;
+  /**
+   * Plain TN3270: ask for this LU by sending `terminalType@luName` (RFC 1646,
+   * as x3270 does; Hercules uses it to pick a device). A second TERMINAL-TYPE
+   * SEND means the host refused it.
+   */
+  luName?: string;
 }
 
 export interface TelnetSession {
@@ -127,7 +138,14 @@ export function createTelnetSession(options: TelnetSessionOptions): TelnetSessio
   if (!/^[\x21-\x7e]+$/.test(terminalType)) {
     throw new Error(`terminal type must be printable ASCII without spaces: "${terminalType}"`);
   }
-  const ttypeBytes = Uint8Array.from(terminalType, (c) => c.charCodeAt(0));
+  const plainLu = options.luName;
+  if (plainLu !== undefined && !/^[\x21-\x7e]+$/.test(plainLu)) {
+    throw new Error(`LU name must be printable ASCII without spaces: "${plainLu}"`);
+  }
+  const ttypeBytes = Uint8Array.from(plainLu ? `${terminalType}@${plainLu}` : terminalType, (c) =>
+    c.charCodeAt(0),
+  );
+  let ttypeSent = false;
   const maxRecord = options.maxRecordLength ?? DEFAULT_MAX_RECORD;
   const e3270 = options.tn3270e;
   if (e3270) {
@@ -325,6 +343,11 @@ export function createTelnetSession(options: TelnetSessionOptions): TelnetSessio
       data[1] === TerminalType.SEND &&
       local.has(TelnetOption.TTYPE)
     ) {
+      if (ttypeSent && plainLu) {
+        events.push({ type: 'luRefused', luName: plainLu });
+        return;
+      }
+      ttypeSent = true;
       send(IAC, SB, TelnetOption.TTYPE, TerminalType.IS, ...ttypeBytes, IAC, SE);
     } else if (data[0] === TelnetOption.TN3270E) {
       tn3270eSubnegotiation(data);

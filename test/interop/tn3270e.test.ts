@@ -75,6 +75,15 @@ describe.each(CLIENTS)('TN3270E interop: $name', (factory) => {
     expect(s.events.at(-1)).toMatchObject({ lu: 'MYLU01' });
   });
 
+  it.skipIf(!available)('asks for an LU as type@LU on a plain TN3270 host (RFC 1646)', async () => {
+    const s = await session({ tn3270e: false }, 'MYLU01');
+    expect(s.events.at(-1)).toMatchObject({
+      kind: 'negotiated',
+      mode: 'tn3270',
+      type: 'IBM-3279-2-E@MYLU01',
+    });
+  });
+
   it.skipIf(!available)('accepts a counter-offer that drops a function', async () => {
     const s = await session({ functions: [Fn.BIND_IMAGE, Fn.RESPONSES] });
     expect(s.events.at(-1)).toMatchObject({

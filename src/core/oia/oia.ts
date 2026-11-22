@@ -17,7 +17,23 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected';
  * - `tooMuch`: X with the "too much" symbol (insert overflow)
  */
 export type OiaLockSymbol =
-  'system' | 'clock' | 'notConnected' | 'doNotEnter' | 'numeric' | 'tooMuch';
+  | 'system'
+  | 'clock'
+  | 'notConnected'
+  | 'doNotEnter'
+  | 'numeric'
+  | 'tooMuch'
+  /** X -f: the key's function isn't available in this session state. */
+  | 'minusFunction';
+
+/**
+ * Who owns the session, shown in the box at column 2 (3174 OIA):
+ * - `lu-lu`: an application (solid box)
+ * - `sscp`: VTAM's SSCP (boxed person)
+ * - `unbound`: nobody yet (boxed question mark)
+ * - `nvt`: TN3270E NVT mode (N)
+ */
+export type OiaOwner = 'lu-lu' | 'sscp' | 'unbound' | 'nvt';
 
 export interface OiaState {
   connection: ConnectionState;
@@ -31,6 +47,10 @@ export interface OiaState {
   model: string;
   /** The LU the session is bound to, when known (TN3270E). */
   luName?: string;
+  /** The session is TN3270E (an underlined B rather than A). */
+  tn3270e: boolean;
+  /** Who owns the session. */
+  owner: OiaOwner;
 }
 
 export interface OiaInputs {
@@ -42,6 +62,8 @@ export interface OiaInputs {
   cols: number;
   model: string;
   luName?: string;
+  tn3270e?: boolean;
+  owner?: OiaOwner;
 }
 
 const INHIBIT_SYMBOL: Record<InhibitReason, OiaLockSymbol> = {
@@ -55,6 +77,7 @@ const ERROR_SYMBOL: Record<OperatorError, OiaLockSymbol> = {
   protected: 'doNotEnter',
   numeric: 'numeric',
   overflow: 'tooMuch',
+  minusFunction: 'minusFunction',
 };
 
 export function computeOia(i: OiaInputs): OiaState {
@@ -69,6 +92,8 @@ export function computeOia(i: OiaInputs): OiaState {
     insert: i.insertMode,
     cursor: { row: Math.floor(i.cursor / i.cols), col: i.cursor % i.cols },
     model: i.model,
+    tn3270e: i.tn3270e ?? false,
+    owner: i.owner ?? 'lu-lu',
   };
   if (i.luName !== undefined) state.luName = i.luName;
   return state;

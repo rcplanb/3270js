@@ -19,7 +19,21 @@ describe('computeOia', () => {
       insert: false,
       cursor: { row: 22, col: 11 },
       model: '3279-2-E',
+      tn3270e: false,
+      owner: 'lu-lu',
     });
+  });
+
+  it('maps the minus-function error to X -f, and carries the TN3270E session', () => {
+    const s = computeOia({
+      ...base,
+      operatorError: 'minusFunction',
+      tn3270e: true,
+      owner: 'sscp',
+      luName: 'SC0TCP01',
+    });
+    expect(s.lock).toEqual({ symbol: 'minusFunction', reason: 'minusFunction' });
+    expect(s).toMatchObject({ tn3270e: true, owner: 'sscp', luName: 'SC0TCP01' });
   });
 
   it('maps each inhibit reason to its OIA symbol', () => {

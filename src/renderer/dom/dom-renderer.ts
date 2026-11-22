@@ -21,7 +21,11 @@ const LOCK_TEXT: Record<OiaLockSymbol, string> = {
   doNotEnter: 'X Protected',
   numeric: 'X Numeric',
   tooMuch: 'X Overflow',
+  minusFunction: 'X -f',
 };
+
+/** The session-owner box as c3270 writes it (standard font). */
+const OWNER_TEXT = { 'lu-lu': ' ', sscp: 'S', unbound: '?', nvt: 'N' } as const;
 
 export class DomRenderer implements Renderer {
   readonly element: HTMLElement;
@@ -265,9 +269,17 @@ function wordsOia(state: OiaState, cols: number): string {
   const put = (at: number, text: string) => {
     for (let i = 0; i < text.length && at + i < cols; i++) line[at + i] = text[i]!;
   };
-  if (state.connection === 'connected') put(0, '4A');
-  else if (state.connection === 'connecting') put(0, '4?');
-  if (state.lock) put(8, LOCK_TEXT[state.lock.symbol]);
+  if (state.connection === 'connected')
+    put(0, `4${state.tn3270e ? 'B' : 'A'}${OWNER_TEXT[state.owner]}`);
+  else if (state.connection === 'connecting') put(0, '4 ?');
+  const unboundWait =
+    state.connection === 'connected' &&
+    state.tn3270e &&
+    state.owner === 'unbound' &&
+    state.lock?.reason === 'awaitingFirst';
+  if (unboundWait) put(8, 'X [TN3270E]');
+  else if (state.lock) put(8, LOCK_TEXT[state.lock.symbol]);
+  if (state.luName && state.connection === 'connected') put(cols - 25, state.luName.slice(0, 8));
   if (state.insert) put(cols - 29, '^');
   const pos = (n: number) => String(n + 1).padStart(3, '0');
   put(cols - 7, `${pos(state.cursor.row)}/${pos(state.cursor.col)}`);

@@ -358,6 +358,13 @@ export class Keyboard {
     s.writeChar(to, s.charAt(from), s.attributesAt(from));
   }
 
+  /** Refuse a key whose function isn't available now: the minus-function operator error. */
+  minusFunction(): KeyResult {
+    let result: KeyResult = { accepted: false, outputs: [] };
+    this.#update(() => (result = this.#error('minusFunction')));
+    return result;
+  }
+
   #error(error: OperatorError): KeyResult {
     this.#operatorError = error;
     return { accepted: false, error, outputs: [] };

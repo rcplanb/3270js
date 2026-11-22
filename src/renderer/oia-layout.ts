@@ -39,8 +39,17 @@ function lockCells(state: OiaState): OiaCell[] {
       return [...X, g('human'), ...text('NUM')];
     case 'tooMuch':
       return [...X, g('human'), ...text('>')];
+    case 'minusFunction':
+      return [...X, ...text('-f')];
   }
 }
+
+const OWNER_GLYPH = {
+  'lu-lu': g('boxSolid'),
+  sscp: g('boxHuman'),
+  unbound: g('boxQuestion'),
+  nvt: { char: 'N' },
+} as const;
 
 /** Plain-language description of the status line, for assistive technology. */
 export function oiaDescription(state: OiaState): string {
@@ -52,6 +61,18 @@ export function oiaDescription(state: OiaState): string {
         ? 'Connecting'
         : 'Not connected',
   ];
+  if (state.connection === 'connected' && state.tn3270e) {
+    parts.push(
+      `TN3270E${state.luName ? ` LU ${state.luName}` : ''}, ${
+        {
+          'lu-lu': 'bound to an application',
+          sscp: 'owned by the SSCP (VTAM)',
+          unbound: 'not bound',
+          nvt: 'NVT mode',
+        }[state.owner]
+      }`,
+    );
+  }
   if (lock) {
     parts.push(
       {
@@ -64,6 +85,7 @@ export function oiaDescription(state: OiaState): string {
         doNotEnter: 'input inhibited: protected field, go elsewhere',
         numeric: 'input inhibited: numeric field',
         tooMuch: 'input inhibited: too much input for the field',
+        minusFunction: 'input inhibited: function not available',
       }[lock.symbol],
     );
   }
@@ -79,10 +101,19 @@ export function oiaCells(state: OiaState, o: OiaLayoutOptions): OiaCell[] {
     items.forEach((c, i) => at + i < cols && (cells[at + i] = c));
 
   // Columns 0-2: controller ready, session type (A = TN3270, B = TN3270E), owner.
-  if (state.connection === 'connected') put(0, [g('box4'), g('underA'), g('boxSolid')]);
+  if (state.connection === 'connected')
+    put(0, [g('box4'), g(state.tn3270e ? 'underB' : 'underA'), OWNER_GLYPH[state.owner]]);
   else if (state.connection === 'connecting') put(0, [g('box4'), null, g('boxQuestion')]);
 
-  put(8, lockCells(state));
+  // x3270 shows "X [TN3270E]" while a TN3270E session waits for its first BIND or data.
+  const unboundWait =
+    state.connection === 'connected' &&
+    state.tn3270e &&
+    state.owner === 'unbound' &&
+    state.lock?.reason === 'awaitingFirst';
+  put(8, unboundWait ? [g('lock'), null, ...text('[TN3270E]')] : lockCells(state));
+  if (state.luName && state.connection === 'connected')
+    put(cols - 25, text(state.luName.slice(0, 8)));
   if (o.shift) put(cols - 39, [g('upShift')]);
   if (state.insert) put(cols - 29, [g('insert')]);
   const pos = (n: number) => String(n + 1).padStart(3, '0');
