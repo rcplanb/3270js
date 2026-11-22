@@ -3,7 +3,7 @@
  * canvas renderers.
  */
 import type { CodePage } from '../core/codepage/index.js';
-import { isGraphic } from '../core/codepage/index.js';
+import { displayChar } from '../core/codepage/index.js';
 import { Highlighting, type Screen } from '../core/screen/index.js';
 import type { ColorSlot } from './theme.js';
 
@@ -69,7 +69,7 @@ export function cellStyle(screen: Screen, address: number, o: CellStyleOptions):
   if (!isFa && !hidden) {
     if (byte === DUP) char = '*' + OVERLINE;
     else if (byte === FM) char = ';' + OVERLINE;
-    else if (isGraphic(byte)) char = o.codePage.toUnicode(byte);
+    else char = displayChar(byte, cell.charset, o.codePage) ?? ' ';
   }
 
   let fg: ColorSlot;

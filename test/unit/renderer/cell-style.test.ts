@@ -26,6 +26,15 @@ describe('cellStyle', () => {
     expect(cellStyle(screen(), 1, mono)).toMatchObject({ char: 'L', fieldAttribute: false });
   });
 
+  it('draws Graphic Escape (APL set) cells from code page 310, as ISPF box lines', () => {
+    const s = new Screen(1, 4);
+    // ISPF: GE X'C5' ┌, GE X'A2' ─, GE X'D5' ┐; a plain X'A2' is "s" in CP037.
+    [0xc5, 0xa2, 0xd5].forEach((b, i) => s.writeChar(i, b, { charset: 0xf1 }));
+    s.writeChar(3, 0xa2);
+    expect([0, 1, 2, 3].map((a) => cellStyle(s, a, mono).char).join('')).toBe('┌─┐s');
+    expect(s.toText(cp037)).toEqual(['┌─┐s']);
+  });
+
   it('draws field attribute cells as blanks', () => {
     expect(cellStyle(screen(), 0, mono)).toMatchObject({ char: ' ', fieldAttribute: true });
   });
