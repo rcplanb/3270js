@@ -91,6 +91,8 @@ can run in parallel with it.
     as SSCP-LU-DATA (`src/core/sscp.ts`); NVT-DATA goes to the `nvt` event.
     `sessionMode` reports unbound / lu-lu / sscp-lu / nvt. Screen sizes from the BIND
     aren't applied yet (task 8).
+  - Fixtures: `test/traces/os390/` — the USS screen and the unanswered TSO logon,
+    recorded on the museum's OS/390 2.10 (no passwords), replayed in tests.
 
 - [ ] **3. Session states, status line, minus function**
   - Acceptance:
