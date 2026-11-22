@@ -192,3 +192,48 @@ describe('a refused LU on plain TN3270', () => {
     expect(host.closed).toBe(true);
   });
 });
+
+describe('Attn and SysReq over TN3270E', () => {
+  it('Attn is X -f until a BIND, then telnet IP', () => {
+    const { host, term } = connected();
+    expect(term.press({ type: 'attn' }).accepted).toBe(false);
+    expect(term.oia.state.lock?.symbol).toBe('minusFunction');
+    expect(host.takeSent()).toBe('');
+    term.press({ type: 'reset' });
+    host.write(frame(TELNET_BIND));
+    host.write(frame('000000000005c3' + 'c8c5d3d3d6'));
+    expect(term.press({ type: 'attn' }).accepted).toBe(true);
+    expect(host.takeSent()).toBe('fff4');
+  });
+
+  it('SysReq is telnet AO in an application or SSCP session, nothing while unbound', () => {
+    const { host, term } = connected();
+    expect(term.aid('SYSREQ').accepted).toBe(false);
+    expect(host.takeSent()).toBe('');
+    host.write(frame(TSO_BIND));
+    host.write(frame('000000000005c3' + 'c8c5d3d3d6'));
+    expect(term.aid('SYSREQ').accepted).toBe(true);
+    expect(host.takeSent()).toBe('fff5');
+    host.write(frame('0700000000' + 'e4e2e2')); // the server switched us to the SSCP
+    expect(term.aid('SYSREQ').accepted).toBe(true);
+    expect(host.takeSent()).toBe('fff5');
+  });
+
+  it('SysReq does nothing without the SYSREQ function', () => {
+    const host = new FakeHost();
+    const term = new Terminal();
+    void term.connect(host);
+    for (const c of [
+      'fffd28',
+      'fffa280802fff0',
+      `fffa280204${ascii('IBM-3278-2-E')}fff0`,
+      'fffa2803040002fff0', // BIND-IMAGE and RESPONSES only
+    ])
+      host.write(c);
+    host.write(frame(TSO_BIND));
+    host.write(frame('000000000005c3' + 'c8'));
+    host.takeSent();
+    expect(term.aid('SYSREQ').accepted).toBe(false);
+    expect(host.takeSent()).toBe('');
+  });
+});
