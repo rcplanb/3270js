@@ -73,7 +73,7 @@ can run in parallel with it.
     CONTENTION-RESOLUTION) with `WONT TN3270E`, not a counter-offer, so s3270 drops to
     plain TN3270 there; 3270js now handles that impasse too.
 
-- [ ] **2. TN3270E framing and responses**
+- [x] **2. TN3270E framing and responses**
   - Acceptance:
     - The 5-byte header on every record, both ways.
     - Data types routed: 3270-DATA, SCS-DATA (rejected), RESPONSE, BIND-IMAGE, UNBIND,
@@ -82,6 +82,15 @@ can run in parallel with it.
     - Positive and negative responses when the host asks (ALWAYS-RESPONSE,
       ERROR-RESPONSE), including a negative response for a data stream error.
   - Verify: unit tests; interop harness.
+  - Done: found necessary on OS/390 2.10, whose TSO asks for ALWAYS-RESPONSE on its
+    first write and waits (X SYSTEM) until it gets one. Positive and negative responses
+    follow x3270 (no positive response when the write produced a reply; negative `02`
+    for a bad address, `00` otherwise). With BIND-IMAGE agreed, 3270 data is ignored
+    until BIND; UNBIND clears the screen; the BIND's PLU and sizes are exposed
+    (`bindInfo`, `bind` event); SSCP-LU text is shown and Enter sends the typed text
+    as SSCP-LU-DATA (`src/core/sscp.ts`); NVT-DATA goes to the `nvt` event.
+    `sessionMode` reports unbound / lu-lu / sscp-lu / nvt. Screen sizes from the BIND
+    aren't applied yet (task 8).
 
 - [ ] **3. Session states, status line, minus function**
   - Acceptance:
