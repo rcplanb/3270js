@@ -5,7 +5,7 @@ TypeScript, an [xterm.js](https://xtermjs.org/) analogue for IBM mainframes.
 
 ![ISPF on MVS 3.8j TK5 in 3270js](docs/screenshots/demo-ispf-color.png)
 
-**Status:** Phase 2 complete (2026-11-22). Not yet published to npm. See
+**Status:** v0.1.0 (2026-11-22): Phases 1 and 2 complete, Phase 3 under way. Not yet published to npm; see Install. See
 [SPEC.md](SPEC.md), [docs/PLAN.md](docs/PLAN.md) (Phase 1) and
 [docs/PLAN-phase2.md](docs/PLAN-phase2.md) (Phase 2).
 
@@ -45,6 +45,22 @@ nvm use
 npm install
 HERCULES_HOST=<host> npm run dev      # then open http://localhost:5270
 ```
+
+## Install
+
+3270js isn't on npm yet. Each release has a tarball on its
+[GitHub release](https://github.com/rcplanb/3270js/releases): commit it to
+your project and depend on it.
+
+```sh
+mkdir -p vendor && cp 3270js-0.1.0.tgz vendor/
+npm install ./vendor/3270js-0.1.0.tgz   # "3270js": "file:vendor/3270js-0.1.0.tgz"
+npm install ws@8                         # needed by 3270js/node
+```
+
+It needs Node 20 or later, and works from CommonJS (`require`) and ES modules.
+`npm run check:pack` installs the tarball into an empty project and loads every
+entry point.
 
 ## Use it
 
@@ -93,6 +109,9 @@ and clients choose a _named_ target from a fixed list.
 | `3270js/canvas`    | `CanvasRenderer`, `KeyboardMapper`                             |
 | `3270js/websocket` | `WebSocketTransport`                                           |
 | `3270js/node`      | `TcpTransport`, `createWebSocketProxy`                         |
+| `3270js/script`    | `Session`, `tsoLogon`, `tsoLogoff`: drive a session from code  |
+| `3270js/cast`      | `traceToCast`, `traceToCommands`: asciinema export             |
+| `3270js/player`    | `TracePlayer`: replay a trace into a renderer                  |
 | `3270js/fonts/*`   | The optional 3270 font (`3270.css`, WOFF2 and WOFF)            |
 
 Sizes, minified and gzipped: core 17.2 KB, DOM 9.6 KB, canvas 9.8 KB,
