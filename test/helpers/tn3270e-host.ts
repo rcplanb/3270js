@@ -79,6 +79,12 @@ export interface HostScript {
   assignLu?: string;
   /** Functions the server will support. Default BIND-IMAGE, RESPONSES, SYSREQ. */
   functions?: number[];
+  /**
+   * What to do with a FUNCTIONS REQUEST asking for functions the server lacks:
+   * counter-offer the subset (default), or end TN3270E with WONT, as OS/390
+   * 2.10 does.
+   */
+  onUnknownFunction?: 'counter' | 'wont';
 }
 
 export interface ClientRecord {
@@ -241,6 +247,7 @@ export async function startTn3270eHost(script: HostScript = {}): Promise<Started
     let deviceType = '';
     let lu: string | undefined;
     let functions: number[] = [];
+    let hostEnded = false;
 
     const negotiated = (mode: 'tn3270e' | 'tn3270') => {
       s.mode = mode;
@@ -277,7 +284,8 @@ export async function startTn3270eHost(script: HostScript = {}): Promise<Started
           socket.write(sb(TN3270E, Op.SEND, Op.DEVICE_TYPE));
         else if (c[1] === WONT && c[2] === TN3270E) {
           s.push({ kind: 'wont', option: TN3270E });
-          plainNegotiation(); // the client backed off: carry on as plain TN3270
+          // The client backed off: carry on as plain TN3270 (unless we already have).
+          if (!hostEnded) plainNegotiation();
         } else if (c[1] === WILL && c[2] === TTYPE) socket.write(sb(TTYPE, 1));
         else if (c[1] === SB && c[2] === TTYPE && c[3] === 0) {
           deviceType = ascii(c.slice(4, -2));
@@ -321,7 +329,13 @@ export async function startTn3270eHost(script: HostScript = {}): Promise<Started
               socket.write(sb(TN3270E, Op.FUNCTIONS, Op.IS, ...asked));
               negotiated('tn3270e');
             } else {
-              socket.write(sb(TN3270E, Op.FUNCTIONS, Op.REQUEST, ...agreed)); // counter-offer
+              if (script.onUnknownFunction === 'wont') {
+                hostEnded = true;
+                socket.write(Buffer.from([IAC, WONT, TN3270E]));
+                plainNegotiation();
+              } else {
+                socket.write(sb(TN3270E, Op.FUNCTIONS, Op.REQUEST, ...agreed)); // counter-offer
+              }
             }
           } else if (body[0] === Op.FUNCTIONS && body[1] === Op.IS) {
             functions = body.slice(2);

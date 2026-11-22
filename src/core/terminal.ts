@@ -20,7 +20,12 @@ import {
   parseStructuredFields,
 } from './query/index.js';
 import { MODELS, type ModelNumber, Screen } from './screen/index.js';
-import { createTelnetSession, type TelnetSession } from './telnet/index.js';
+import {
+  Tn3270eDataType,
+  createTelnetSession,
+  type TelnetSession,
+  type Tn3270eHeader,
+} from './telnet/index.js';
 import type { Transport } from './transport.js';
 
 export interface TerminalOptions {
@@ -37,8 +42,15 @@ export interface TerminalOptions {
    * terminals. Set false for a plain 3278/3279.
    */
   extendedDataStream?: boolean;
-  /** Override the announced terminal type entirely. */
+  /** Override the announced terminal type entirely (plain TN3270 and TN3270E). */
   terminalType?: string;
+  /**
+   * Accept TN3270E (RFC 2355) when the host offers it. Default true. Hosts
+   * that don't offer it (Hercules, for one) get plain TN3270 either way.
+   */
+  tn3270e?: boolean;
+  /** TN3270E: ask the host for this LU (device or pool name) with CONNECT. */
+  luName?: string;
   /** Code page id or object. Default `cp037`. */
   codePage?: string | CodePage;
   keyboard?: KeyboardOptions;
@@ -47,6 +59,8 @@ export interface TerminalOptions {
 export interface TerminalEvents {
   /** The session reached 3270 mode. */
   connect: undefined;
+  /** TN3270E negotiation completed. */
+  tn3270e: { deviceType: string; luName?: string; functions: number[] };
   disconnect: { reason?: string };
   /** The screen or cursor changed; renderers should repaint dirty rows. */
   render: undefined;
@@ -71,6 +85,10 @@ export class Terminal {
   readonly model: ModelNumber;
   readonly color: boolean;
   readonly terminalType: string;
+  /** The device type asked for in TN3270E. RFC 2355 names only 3278 types; colour goes in Query Reply. */
+  readonly deviceType: string;
+  readonly luName: string | undefined;
+  readonly #tn3270e: boolean;
   readonly codePage: CodePage;
   readonly screen: Screen;
   readonly keyboard: Keyboard;
@@ -85,6 +103,9 @@ export class Terminal {
   #lastAid: number = Aid.NONE;
   #wasLocked = true;
   #renderedVersion = -1;
+  /** TN3270E SEQ-NUMBER for the next 3270-DATA we send. */
+  #seq = 0;
+  #session: { deviceType: string; luName?: string; functions: number[] } | undefined;
 
   constructor(options: TerminalOptions = {}) {
     this.model = options.model ?? 2;
@@ -92,6 +113,9 @@ export class Terminal {
     const suffix = (options.extendedDataStream ?? true) ? '-E' : '';
     this.terminalType =
       options.terminalType ?? `IBM-${this.color ? 3279 : 3278}-${this.model}${suffix}`;
+    this.deviceType = options.terminalType ?? `IBM-3278-${this.model}${suffix}`;
+    this.luName = options.luName;
+    this.#tn3270e = options.tn3270e ?? true;
     const requested = options.codePage ?? 'cp037';
     const cp = typeof requested === 'object' ? requested : getCodePage(requested);
     if (!cp)
@@ -105,6 +129,11 @@ export class Terminal {
 
   get connected(): boolean {
     return this.#telnet?.in3270 ?? false;
+  }
+
+  /** The TN3270E session (device type, LU and functions), when one was negotiated. */
+  get tn3270e(): { deviceType: string; luName?: string; functions: number[] } | undefined {
+    return this.#telnet?.tn3270e ? this.#session : undefined;
   }
 
   /** The screen as text, one string per row. Non-display fields are blank. */
@@ -129,8 +158,20 @@ export class Terminal {
   connect(transport: Transport): Promise<void> {
     if (this.#transport) return Promise.reject(new Error('already connected'));
     this.#transport = transport;
-    this.#telnet = createTelnetSession({ terminalType: this.terminalType });
+    this.#telnet = createTelnetSession({
+      terminalType: this.terminalType,
+      ...(this.#tn3270e
+        ? {
+            tn3270e: {
+              deviceType: this.deviceType,
+              ...(this.luName === undefined ? {} : { luName: this.luName }),
+            },
+          }
+        : {}),
+    });
     this.#lastAid = Aid.NONE;
+    this.#seq = 0;
+    this.#session = undefined;
     const done = new Promise<void>((resolve, reject) => (this.#pending = { resolve, reject }));
     this.#unsubscribe = [
       transport.onData((d) => this.#receive(d)),
@@ -208,8 +249,19 @@ export class Terminal {
           this.#send(e.data);
           break;
         case 'record':
-          hostWrote = this.#hostRecord(e.data) || hostWrote;
+          if (e.header) hostWrote = this.#tn3270eRecord(e.header, e.data) || hostWrote;
+          else hostWrote = this.#hostRecord(e.data) || hostWrote;
           break;
+        case 'tn3270e': {
+          const session = {
+            deviceType: e.deviceType,
+            ...(e.luName === undefined ? {} : { luName: e.luName }),
+            functions: e.functions,
+          };
+          this.#session = session;
+          this.#events.emit('tn3270e', session);
+          break;
+        }
         case 'mode':
           if (e.in3270) {
             this.keyboard.connected();
@@ -231,6 +283,25 @@ export class Terminal {
       }
     }
     this.#refresh(hostWrote);
+  }
+
+  /**
+   * Route a TN3270E message by its data type. Returns true if it was a write.
+   * BIND, UNBIND, responses and SSCP-LU data are Phase 2 task 2.
+   */
+  #tn3270eRecord(header: Tn3270eHeader, data: Uint8Array): boolean {
+    switch (header.dataType) {
+      case Tn3270eDataType.DATA_3270:
+        return this.#hostRecord(data);
+      case Tn3270eDataType.BIND_IMAGE:
+      case Tn3270eDataType.UNBIND:
+        return false;
+      default:
+        this.#events.emit('error', {
+          message: `TN3270E data type X'${header.dataType.toString(16).toUpperCase().padStart(2, '0')}' not supported; ignored`,
+        });
+        return false;
+    }
   }
 
   /** Apply one host record. Returns true if it was a write. */
@@ -290,7 +361,22 @@ export class Terminal {
   }
 
   #sendRecord(data: Uint8Array): void {
-    this.#send(this.#telnet?.frameRecord(data));
+    const telnet = this.#telnet;
+    if (telnet?.tn3270e) {
+      // RFC 2355 §10.4: count every 3270-DATA sent, wrapping at 32767.
+      const seq = this.#seq;
+      this.#seq = (seq + 1) % 32768;
+      this.#send(
+        telnet.frameRecord(data, {
+          dataType: Tn3270eDataType.DATA_3270,
+          requestFlag: 0,
+          responseFlag: 0,
+          seq,
+        }),
+      );
+    } else {
+      this.#send(telnet?.frameRecord(data));
+    }
   }
 
   #send(data: Uint8Array | undefined): void {

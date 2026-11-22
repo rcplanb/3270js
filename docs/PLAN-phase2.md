@@ -48,7 +48,7 @@ can run in parallel with it.
     - Responses: positive `00`, negative `02` (operation check) for a bad address.
     - Attn is `IAC IP`, SysReq is `IAC AO`; Enter on SSCP-LU goes back as SSCP-LU-DATA.
 
-- [ ] **1. TN3270E negotiation** (telnet layer)
+- [x] **1. TN3270E negotiation** (telnet layer)
   - Acceptance:
     - Accept `DO TN3270E`.
     - DEVICE-TYPE REQUEST with the model type (`IBM-3279-2-E` …), plus CONNECT when
@@ -60,6 +60,18 @@ can run in parallel with it.
     - New `Terminal` options: `tn3270e` (default true) and `luName`.
   - Verify: unit tests with the exact RFC 2355 byte sequences; the interop harness
     matches s3270's negotiation.
+  - Done: TN3270E is announced as `IBM-3278-n[-E]` (as s3270 does); plain TN3270
+    keeps `IBM-3279-n-E` for colour. A failed negotiation refuses TN3270E for the rest
+    of the connection. Input goes out as 3270-DATA with SEQ-NUMBER counting from 0.
+    3270js passes the 5 negotiation and framing interop cases; the other 6 are marked
+    pending for tasks 2 and 4.
+  - Checked live (read-only) against **OS/390 2.10's TN3270E server** on the museum's
+    Multiprise 3000: 3270js was assigned LU `SC0TCP01`, agreed BIND-IMAGE, RESPONSES
+    and SYSREQ, and drew the USS screen. OS/390 sends a BIND-IMAGE (PLU `TELNET`,
+    24×80) before the USS screen, which is 3270-DATA with the SNA Erase/Write code
+    `05`. It answers a FUNCTIONS REQUEST naming an unknown function (s3270's
+    CONTENTION-RESOLUTION) with `WONT TN3270E`, not a counter-offer, so s3270 drops to
+    plain TN3270 there; 3270js now handles that impasse too.
 
 - [ ] **2. TN3270E framing and responses**
   - Acceptance:
