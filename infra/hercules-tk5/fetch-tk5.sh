@@ -33,6 +33,14 @@ rm -f "$TARGET/unattended/mode"
 # zipfile does not preserve permissions.
 find "$TARGET" -type f \( -name '*.so*' -o -path '*/bin/*' \) -exec chmod +x {} +
 chmod +x "$TARGET"/mvs "$TARGET"/mvs_ipl
+# An MVS 3270 console at 0010 (Hercules group CONS), alongside the integrated
+# 0009 console that TK5's unattended operation and shutdown scripts use.
+cat >> "$TARGET/local_conf/01" <<'CNF'
+#
+# 3270js: an MVS 3270 console at 0010, Hercules group CONS, alongside the
+# integrated 0009 console (connect with LU CONS or 0010, e.g. ?lu=CONS).
+0010 3270 CONS
+CNF
 find "$TARGET" -maxdepth 2 -type f -name '*.sh' -exec chmod +x {} +
 
 echo "TK5 unpacked to $TARGET"
