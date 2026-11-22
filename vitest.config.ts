@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     include: ['test/unit/**/*.test.ts', 'test/differential/**/*.test.ts'],
     passWithNoTests: true,
+    // Differential tests drive a real s3270 process.
+    testTimeout: 60_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
