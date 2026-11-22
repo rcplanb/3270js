@@ -27,9 +27,21 @@ export interface CellStyle {
   reverse: boolean;
   underscore: boolean;
   blink: boolean;
+  /**
+   * Field outlining (GA23-0059, attribute X'C2'): lines over and under every
+   * character of the field, left of its first character and right of its last.
+   * Bitmask of the OUTLINE values; 0 for none.
+   */
+  outline: number;
   /** This cell holds a field attribute (always drawn blank). */
   fieldAttribute: boolean;
 }
+
+/** Outline sides in `CellStyle.outline`. */
+export const OUTLINE = { BOTTOM: 0x01, RIGHT: 0x02, TOP: 0x04, LEFT: 0x08 } as const;
+
+/** Transparency values (attribute X'46') that let what is behind show through. */
+const TRANSPARENT = new Set([0xf0, 0xf1, 0xf2]);
 
 const COLOR_SLOTS: Record<number, ColorSlot> = {
   0xf0: 'neutralBlack',
@@ -82,6 +94,18 @@ export function cellStyle(screen: Screen, address: number, o: CellStyleOptions):
     fg = COLOR_SLOTS[fgValue] ?? baseColor(protectedField, intensified);
     bg = COLOR_SLOTS[bgValue] ?? 'background';
   }
+  // Transparent: nothing lies behind a character cell (no graphics), so the
+  // cell's own background colour is simply not painted.
+  const transparency = (!isFa && cell.transparency) || field?.transparency || 0;
+  if (TRANSPARENT.has(transparency)) bg = 'background';
+
+  let outline = 0;
+  if (field && !isFa && field.outlining && field.length > 0) {
+    const last = (field.dataStart + field.length - 1) % screen.size;
+    outline = field.outlining & (OUTLINE.TOP | OUTLINE.BOTTOM);
+    if (address === field.dataStart) outline |= field.outlining & OUTLINE.LEFT;
+    if (address === last) outline |= field.outlining & OUTLINE.RIGHT;
+  }
 
   return {
     char,
@@ -90,6 +114,7 @@ export function cellStyle(screen: Screen, address: number, o: CellStyleOptions):
     reverse: highlighting === Highlighting.REVERSE,
     underscore: highlighting === Highlighting.UNDERSCORE,
     blink: highlighting === Highlighting.BLINK,
+    outline,
     fieldAttribute: isFa,
   };
 }
@@ -116,13 +141,13 @@ export function rowRuns(screen: Screen, row: number, o: CellStyleOptions): Run[]
   let current: Run | undefined;
   let key = '';
   for (let col = 0; col < screen.cols; col++) {
-    const { char, fg, bg, reverse, underscore, blink } = cellStyle(
+    const { char, fg, bg, reverse, underscore, blink, outline } = cellStyle(
       screen,
       row * screen.cols + col,
       o,
     );
-    const style = { fg, bg, reverse, underscore, blink };
-    const k = `${style.fg}|${style.bg}|${style.reverse}|${style.underscore}|${style.blink}`;
+    const style = { fg, bg, reverse, underscore, blink, outline };
+    const k = `${style.fg}|${style.bg}|${style.reverse}|${style.underscore}|${style.blink}|${style.outline}`;
     if (current && k === key) {
       current.text += char;
       current.length++;

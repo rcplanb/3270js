@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cp037 } from '../../../src/core/codepage/index.js';
 import { Color, Highlighting, Screen } from '../../../src/core/screen/index.js';
-import { cellStyle, rowRuns } from '../../../src/renderer/cell-style.js';
+import { OUTLINE, cellStyle, rowRuns } from '../../../src/renderer/cell-style.js';
 
 const t = (s: string) => [...cp037.encode(s)];
 const mono = { codePage: cp037, displayMode: 'monochrome' as const };
@@ -33,6 +33,30 @@ describe('cellStyle', () => {
     s.writeChar(3, 0xa2);
     expect([0, 1, 2, 3].map((a) => cellStyle(s, a, mono).char).join('')).toBe('┌─┐s');
     expect(s.toText(cp037)).toEqual(['┌─┐s']);
+  });
+
+  it('outlines a field: over and under every character, left and right at its ends', () => {
+    const s = new Screen(1, 12);
+    s.startField(0, 0x40, { outlining: 0x0f }); // all four sides
+    t('ABCD').forEach((b, i) => s.writeChar(1 + i, b));
+    s.startField(5, 0x60);
+    const o = (a: number) => cellStyle(s, a, color).outline;
+    expect(o(0)).toBe(0); // the attribute cell itself
+    expect(o(1)).toBe(OUTLINE.TOP | OUTLINE.BOTTOM | OUTLINE.LEFT);
+    expect(o(2)).toBe(OUTLINE.TOP | OUTLINE.BOTTOM);
+    expect(o(4)).toBe(OUTLINE.TOP | OUTLINE.BOTTOM | OUTLINE.RIGHT);
+    expect(o(6)).toBe(0); // the next field has none
+  });
+
+  it('does not paint the background of transparent cells', () => {
+    const s = new Screen(1, 6);
+    s.startField(0, 0x60, { background: 0xf2 });
+    s.writeChar(1, 0xc1);
+    s.startField(2, 0x60, { background: 0xf2, transparency: 0xf0 });
+    s.writeChar(3, 0xc1);
+    s.writeChar(4, 0xc1, { transparency: 0xff }); // opaque on the character overrides nothing here
+    expect(cellStyle(s, 1, color).bg).toBe('red');
+    expect(cellStyle(s, 3, color).bg).toBe('background');
   });
 
   it('draws field attribute cells as blanks', () => {

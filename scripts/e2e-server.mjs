@@ -8,8 +8,11 @@ const root = resolve(import.meta.dirname, '..');
 const replay = await startTraceHost(resolve(root, 'test/traces/tk5/ispf-tour.json'));
 // Model 5 (27x132), recorded in colour: ISPF switches to the alternate size with EWA.
 const replay5 = await startTraceHost(resolve(root, 'test/traces/tk5/ispf-tour-3279-5.json'));
+// A synthetic screen of outlined and transparent fields.
+const outlining = await startTraceHost(resolve(root, 'test/traces/synthetic/outlining.json'));
 const targets = {
   replay: { host: '127.0.0.1', port: replay.address().port },
+  outlining: { host: '127.0.0.1', port: outlining.address().port },
   'replay-model5': { host: '127.0.0.1', port: replay5.address().port },
 };
 if (process.env.HERCULES_HOST) {

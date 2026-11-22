@@ -29,6 +29,14 @@ for (const renderer of ['dom', 'canvas'] as const) {
     });
   });
 
+  test.describe(`${renderer} renderer, outlining`, () => {
+    test('draws field outlining and leaves transparent backgrounds unpainted', async ({ page }) => {
+      await page.goto(`/?target=outlining&renderer=${renderer}&color=1&autoconnect`);
+      await waitForScreen(page, /FIELD OUTLINING/, 'the outlining screen');
+      await expect(page.locator('#terminal')).toHaveScreenshot(`outlining-${renderer}.png`);
+    });
+  });
+
   test.describe(`${renderer} renderer, model 5`, () => {
     test('shows ISPF at 27x132 after Erase/Write Alternate', async ({ page }) => {
       const errors: string[] = [];
