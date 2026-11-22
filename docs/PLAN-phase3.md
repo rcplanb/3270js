@@ -109,7 +109,7 @@ Each task is one PR.
     - The trace recorder is now built on the observer, so there's one redaction path.
     - Equivalence: all 9 recorded traces (TK5 mono, colour and models 2–5; OS/390 TN3270E; synthetic) match `Terminal` cell for cell after every host record.
 
-- [ ] **1. Screen recognisers and readiness**
+- [x] **1. Screen recognisers and readiness**
   - Acceptance:
     - Small, composable matchers over a screen: text anywhere, text on a row, the field after a label, a regex over the screen text.
     - A `ready` notion that SimH Assist can use instead of prompt regexes: the keyboard is unlocked, the host has been quiet for N ms, and an optional matcher holds.
@@ -120,6 +120,15 @@ Each task is one PR.
       - the ISPF primary menu
       - the password prompt, as a non-display field
   - Verify: unit tests on recorded screens (fixtures).
+  - Done:
+    - `src/core/recognise/` gives three layers:
+      - `match` combinators (text, row, at, cursor in a hidden field, all/any/not) and `fieldAfter(label)`
+      - `recognise()`: the kind (`hercules`, `vtam-logon`, `password`, `more`, `ispf-primary`, `ispf-panel`, `tso-ready`, `unknown`), the ISPF title and the command field
+      - `screenState(source, locked)`: the plain object the Docent will get, with labelled fields and hidden values always ''
+    - They work on a `Terminal` or a `SessionObserver`.
+    - **Password** is recognised by the cursor being in an unprotected non-display field, not by wording.
+    - Readiness is the keyboard lock, plus the observer's `ready` quiet period.
+    - Tested on the recorded TK5 logon and ISPF tour, OS/390's USS screen, and a synthetic OS/390-style ISPF menu.
 
 - [ ] **2. Public scripting helper (`3270js/script`)**
   - Acceptance:
