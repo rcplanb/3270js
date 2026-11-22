@@ -238,6 +238,10 @@ export class Terminal {
 
   /** Press a key. Anything the key sends goes to the host. */
   press(action: KeyAction): KeyResult {
+    if (this.#telnet?.tn3270e) {
+      if (action.type === 'attn') return this.#tn3270eAttn();
+      if (action.type === 'aid' && action.key === 'SYSREQ') return this.#tn3270eSysReq();
+    }
     if (action.type === 'aid' && this.sessionMode === 'sscp-lu') return this.#sscpAid(action.key);
     const result = this.keyboard.press(action);
     if (action.type === 'aid' && result.accepted) this.#lastAid = aidForKey(action.key);
@@ -288,6 +292,39 @@ export class Terminal {
       if (!r.accepted) return r;
     }
     return this.type(text);
+  }
+
+  /**
+   * Attn on TN3270E (RFC 2355 §11, x3270 Attn_action): telnet IP once a BIND
+   * has arrived; on an unbound session the function isn't available (X -f).
+   * Plain TN3270 keeps PCOMM's PA1 short read plus telnet BREAK (keyboard.ts).
+   */
+  #tn3270eAttn(): KeyResult {
+    if (!this.#bind) {
+      const refused = this.keyboard.minusFunction();
+      this.#refresh(false);
+      return refused;
+    }
+    this.#send(this.#telnet?.command('IP'));
+    return { accepted: true, outputs: [] };
+  }
+
+  /**
+   * SysReq on TN3270E (RFC 2355 §10.5, x3270 net_abort): telnet AO, which
+   * asks the server to switch the terminal between the application and VTAM's
+   * SSCP. Sent only with the SYSREQ function agreed and the session owned by
+   * an application or the SSCP; otherwise the key does nothing, as in x3270.
+   */
+  #tn3270eSysReq(): KeyResult {
+    const telnet = this.#telnet;
+    if (
+      !telnet?.functions.has(Tn3270eFunction.SYSREQ) ||
+      (this.#mode !== 'lu-lu' && this.#mode !== 'sscp-lu')
+    ) {
+      return { accepted: false, outputs: [] };
+    }
+    this.#send(telnet.command('AO'));
+    return { accepted: true, outputs: [] };
   }
 
   /**

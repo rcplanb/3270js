@@ -82,7 +82,10 @@ const ERROR_SYMBOL: Record<OperatorError, OiaLockSymbol> = {
 
 export function computeOia(i: OiaInputs): OiaState {
   let lock: OiaState['lock'];
-  if (i.inhibit) lock = { symbol: INHIBIT_SYMBOL[i.inhibit], reason: i.inhibit };
+  // X -f replaces whatever was showing (x3270 status_minus), even X SYSTEM.
+  if (i.operatorError === 'minusFunction')
+    lock = { symbol: 'minusFunction', reason: 'minusFunction' };
+  else if (i.inhibit) lock = { symbol: INHIBIT_SYMBOL[i.inhibit], reason: i.inhibit };
   else if (i.operatorError)
     lock = { symbol: ERROR_SYMBOL[i.operatorError], reason: i.operatorError };
 

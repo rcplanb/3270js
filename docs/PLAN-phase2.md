@@ -126,12 +126,16 @@ can run in parallel with it.
     then the `type@LU` request, so named LUs there need TN3270 server configuration;
     both 3270js and s3270 report it the same way.
 
-- [ ] **4. Attn and SysReq on TN3270E**
+- [x] **4. Attn and SysReq on TN3270E**
   - Acceptance:
     - **Attn:** telnet `IAC IP` when bound; minus function when not.
     - **SysReq:** `IAC AO` when the SYSREQ function is negotiated. Without it, the
       Phase 1 test-request read.
   - Verify: unit tests; interop harness against s3270's bytes.
+  - Done, following x3270: Attn is `IAC IP` once a BIND has arrived, `X -f` before;
+    SysReq is `IAC AO` with SYSREQ agreed and an application or SSCP session, and does
+    nothing otherwise. `X -f` takes priority over other lock symbols in the status line.
+    3270js now passes all 14 interop cases, as s3270 does.
 
 ### Extended data stream (→ Checkpoint F)
 

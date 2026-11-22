@@ -61,9 +61,6 @@ const settle = () => new Promise((r) => setTimeout(r, 100));
 const t3270js: ClientFactory = {
   name: '3270js',
   available: true,
-  pending: {
-    'sends Attn as IAC IP and SysReq as IAC AO': 'task 4',
-  },
   create() {
     let term: Terminal | undefined;
     const t = () => {
