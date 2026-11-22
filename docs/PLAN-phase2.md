@@ -139,7 +139,7 @@ can run in parallel with it.
 
 ### Extended data stream (→ Checkpoint F)
 
-- [ ] **5. Reply modes and Read Partition types**
+- [x] **5. Reply modes and Read Partition types**
   - Acceptance:
     - WSF Set Reply Mode: field, extended field and character modes.
     - Inbound reads include SFE (extended field) or SA (character) orders as each mode
@@ -147,6 +147,15 @@ can run in parallel with it.
     - Read Partition RB/RM/RMA (types F2, F6, 6E).
     - Query Reply's Reply Modes reply now claims all three.
   - Verify: unit tests against s3270's inbound bytes for the same screens.
+  - Done, following x3270: Set Reply Mode (field, extended field, character with its
+    attribute list), reset by an Erase/Write with the WCC reset bit; Read Buffer sends
+    SFE in the extended modes and SA for the listed attributes in character mode;
+    Read Modified does too, a character inheriting its field's attributes. Read
+    Partition RB/RM/RMA answer with AID X'61'; Query and Query List need partition
+    X'FF'. Query List (List) returns only the named replies, or Null. Query Reply:
+    all three reply modes, RPQ Names ("3270js"); DDM deliberately not claimed (it
+    advertises IND$FILE). Interop: 9 cases byte-identical to s3270
+    (`test/interop/reply-modes.test.ts`).
 
 - [x] **6. Colour and highlighting differential**
   - Acceptance:
@@ -214,6 +223,19 @@ can run in parallel with it.
     - Not part of the main bundle.
   - Verify: e2e screenshots with the font.
 
+- [ ] **13. Block (rectangular) selection and copy** _(requested 2026-11-22)_
+  - Acceptance:
+    - Dragging selects a rectangle of cells, as in PCOMM and other IBM emulators,
+      not a run of whole lines; Cmd/Ctrl+C copies it to the system clipboard as one
+      line per row, trailing blanks trimmed, non-display fields blank.
+    - Both renderers: the canvas renderer's overlay becomes rectangular; the DOM
+      renderer gets its own selection layer (the browser's native selection can
+      only follow lines), keeping screen-reader text intact.
+    - Clicking without dragging still moves the cursor; a modifier (Shift-drag)
+      extends the selection.
+  - Verify: unit tests for the selected text; e2e drag-and-copy in all three
+    browsers, both renderers, reading the clipboard.
+
 - [ ] **12. Phase 2 acceptance and docs**
   - Acceptance:
     - A TN3270E session (named LU, BIND, Attn, SysReq) passes against the test host and
@@ -229,7 +251,7 @@ can run in parallel with it.
 | ----- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | **E** | Tasks 0–4: TN3270E interop matches s3270 on negotiation, CONNECT, BIND, responses and screens | TN3270E is right without a real server                    |
 | **F** | Tasks 5–8: attribute differential passes on 3279 traces; models 3–5 work live                 | Colour, highlighting and screen sizes match the reference |
-| **G** | Tasks 9–12: Phase 2 acceptance                                                                | Phase 2 done                                              |
+| **G** | Tasks 9–13: Phase 2 acceptance                                                                | Phase 2 done                                              |
 
 ## Risks
 

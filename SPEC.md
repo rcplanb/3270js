@@ -65,6 +65,7 @@ _Already delivered during Phase 1:_ Query Reply (Read Partition Query and Query 
 - **Models 3, 4 and 5 verified live** (EWA to 32×80, 43×80 and 27×132 on TK5), with recorded traces.
 - **More code pages:** 1047, 500, 285 and 1140 (with the euro), using the existing generator.
 - **APL:** draw GE and APL-set characters as their real APL glyphs.
+- **Block selection and copy** _(requested 2026-11-22)_: drag a rectangle of cells, as in IBM's emulators, and copy it to the system clipboard, in both renderers.
 - **The optional 3270 font** (ADR 0001): `3270js/fonts/3270-Regular.woff` plus `@font-face` CSS and its licence notice.
 
 ### Phase 3: Embedding and integration features

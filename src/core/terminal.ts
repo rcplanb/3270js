@@ -7,7 +7,14 @@ import { type OutboundGeometry, type OutboundResult, processOutbound } from './d
 
 type OutboundSense = NonNullable<OutboundResult['sense']>;
 import { Emitter } from './events.js';
-import { Aid, aidForKey, type AidKey, readBuffer, readModified } from './inbound/index.js';
+import {
+  Aid,
+  aidForKey,
+  type AidKey,
+  readBuffer,
+  readModified,
+  type ReplyModeState,
+} from './inbound/index.js';
 import {
   Keyboard,
   type KeyAction,
@@ -16,7 +23,9 @@ import {
 } from './keyboard/index.js';
 import { OiaModel, type ConnectionState, type OiaOwner, type OiaState } from './oia/index.js';
 import {
+  QueryListType,
   ReadPartitionType,
+  ReplyModeCode,
   StructuredFieldId,
   buildQueryReply,
   parseStructuredFields,
@@ -133,6 +142,8 @@ export class Terminal {
   /** TN3270E SEQ-NUMBER for the next 3270-DATA we send. */
   #seq = 0;
   #session: { deviceType: string; luName?: string; functions: number[] } | undefined;
+  /** Set Reply Mode state; field mode until the host says otherwise. */
+  #reply: ReplyModeState = { mode: 'field' };
   #mode: SessionMode = 'unbound';
   #bind: BindInfo | undefined;
   /** SSCP-LU: where the host's text ended and the operator's input starts. */
@@ -218,6 +229,7 @@ export class Terminal {
         : {}),
     });
     this.#lastAid = Aid.NONE;
+    this.#setReply({ mode: 'field' });
     this.#seq = 0;
     this.#session = undefined;
     this.#mode = 'unbound';
@@ -510,16 +522,32 @@ export class Terminal {
     );
   }
 
+  #setReply(reply: ReplyModeState): void {
+    this.#reply = reply;
+    this.keyboard.reply = reply.mode === 'field' ? undefined : reply;
+  }
+
+  /** The reply mode the host set with Set Reply Mode (field mode by default). */
+  get replyMode(): ReplyModeState {
+    return this.#reply;
+  }
+
   /** Apply one host record. */
   #hostRecord(record: Uint8Array): { isWrite: boolean; sense?: OutboundSense } {
     const r = processOutbound(this.screen, record, this.#geometry, { color: this.color });
     for (const message of [...r.errors, ...r.warnings]) this.#events.emit('error', { message });
 
+    // An Erase/Write with the WCC reset bit returns to field reply mode (x3270 ctlr_write).
+    if (r.wccReset && (r.command === 'EW' || r.command === 'EWA'))
+      this.#setReply({ mode: 'field' });
     if (r.read) {
       const reply =
         r.read === 'buffer'
-          ? readBuffer(this.screen, this.#lastAid)
-          : readModified(this.screen, this.#lastAid, { all: r.read === 'modifiedAll' });
+          ? readBuffer(this.screen, this.#lastAid, this.#reply)
+          : readModified(this.screen, this.#lastAid, {
+              all: r.read === 'modifiedAll',
+              reply: this.#reply,
+            });
       this.#sendRecord(reply);
     }
     let sense = r.sense;
@@ -538,11 +566,11 @@ export class Terminal {
     return sense ? { isWrite, sense } : { isWrite };
   }
 
-  /** Write Structured Field. Phase 1 answers Read Partition Query / Query List. */
   /**
-   * Write Structured Field: Read Partition Query / Query List, and Outbound
-   * 3270DS (a write carried in a structured field, which OS/390's ISPF uses).
-   * Anything else is a command reject, as in x3270.
+   * Write Structured Field (x3270 sf.c): Read Partition (Query, Query List,
+   * and RB/RM/RMA reads), Set Reply Mode, and Outbound 3270DS (a write carried
+   * in a structured field, which OS/390's ISPF uses). Anything else, or a
+   * partition other than the implicit one, is a command reject.
    */
   #structuredFields(payload: Uint8Array): { isWrite: boolean; sense?: OutboundSense } {
     const { fields, errors } = parseStructuredFields(payload);
@@ -550,13 +578,52 @@ export class Terminal {
     let sense: OutboundSense | undefined = errors.length ? 'commandReject' : undefined;
     for (const message of errors) this.#events.emit('error', { message });
     for (const f of fields) {
+      const partition = f.data[0];
       const type = f.data[1];
       if (
         f.id === StructuredFieldId.READ_PARTITION &&
-        (type === ReadPartitionType.QUERY || type === ReadPartitionType.QUERY_LIST)
+        (type === ReadPartitionType.QUERY || type === ReadPartitionType.QUERY_LIST) &&
+        partition === 0xff
       ) {
         const { rows, cols } = this.#geometry.alternate;
-        this.#sendRecord(buildQueryReply({ rows, cols, color: this.color }));
+        // Query List type List names the replies wanted; Equivalent and All get everything.
+        const only =
+          type === ReadPartitionType.QUERY_LIST && f.data[2] === QueryListType.LIST
+            ? [...f.data.subarray(3)]
+            : undefined;
+        this.#sendRecord(
+          buildQueryReply({ rows, cols, color: this.color, ...(only ? { only } : {}) }),
+        );
+      } else if (
+        f.id === StructuredFieldId.READ_PARTITION &&
+        partition === 0x00 &&
+        (type === ReadPartitionType.READ_BUFFER ||
+          type === ReadPartitionType.READ_MODIFIED ||
+          type === ReadPartitionType.READ_MODIFIED_ALL)
+      ) {
+        // Reads of the implicit partition answer with the Query Reply AID (x3270 sf_read_part).
+        this.#sendRecord(
+          type === ReadPartitionType.READ_BUFFER
+            ? readBuffer(this.screen, Aid.QUERY_REPLY, this.#reply)
+            : readModified(this.screen, Aid.QUERY_REPLY, {
+                all: type === ReadPartitionType.READ_MODIFIED_ALL,
+                reply: this.#reply,
+              }),
+        );
+      } else if (
+        f.id === StructuredFieldId.SET_REPLY_MODE &&
+        partition === 0x00 &&
+        (type === ReplyModeCode.FIELD ||
+          type === ReplyModeCode.EXTENDED_FIELD ||
+          type === ReplyModeCode.CHARACTER)
+      ) {
+        this.#setReply(
+          type === ReplyModeCode.FIELD
+            ? { mode: 'field' }
+            : type === ReplyModeCode.EXTENDED_FIELD
+              ? { mode: 'extendedField' }
+              : { mode: 'character', attributes: [...f.data.subarray(2)] },
+        );
       } else if (
         f.id === StructuredFieldId.OUTBOUND_3270DS &&
         f.data[0] === 0x00 &&

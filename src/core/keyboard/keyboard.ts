@@ -4,7 +4,7 @@
  * implemented by x3270's kybd.c, our reference emulator. DBCS is not
  * supported.
  */
-import { Aid, aidForKey, readModified } from '../inbound/index.js';
+import { Aid, type ReplyModeState, aidForKey, readModified } from '../inbound/index.js';
 import {
   type Screen,
   eraseAllUnprotected,
@@ -46,6 +46,8 @@ export class Keyboard {
   #inhibit: InhibitReason | undefined = 'notConnected';
   #operatorError: OperatorError | undefined;
   #insertMode = false;
+  /** The host's reply mode (Set Reply Mode), used when an AID key sends Read Modified. */
+  reply: ReplyModeState | undefined;
   #listeners = new Set<() => void>();
 
   constructor(screen: Screen, options: KeyboardOptions = {}) {
@@ -239,7 +241,7 @@ export class Keyboard {
     const s = this.#screen;
     const aid = aidForKey(key);
     if (key === 'CLEAR') s.clear();
-    const data = readModified(s, aid);
+    const data = readModified(s, aid, this.reply ? { reply: this.reply } : {});
     this.#inhibit = 'wait';
     this.#insertMode = false;
     return ok([{ kind: 'record', data }]);
