@@ -10,12 +10,13 @@ import { TcpTransport } from '../../src/node.js';
 export const env = {
   host: process.env.HERCULES_HOST,
   port: Number(process.env.HERCULES_PORT ?? 3270),
-  user: process.env.TSO_USER ?? 'HERC01',
+  user: process.env.TSO_USER ?? 'HERC03',
   password: process.env.TSO_PASSWORD,
 };
 export const liveEnabled = Boolean(env.host && env.password);
 
-const CONTINUE = /\*\*\*\s*$/m;
+// TSO's continuation marker: a line starting with *** (not Revedit's ******).
+const CONTINUE = /^\s*\*\*\*(\s|$)/m;
 const READY = /^\s*READY\s*$/m;
 
 export class TsoSession {

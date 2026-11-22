@@ -25,7 +25,8 @@ export async function waitForScreen(page: Page, re: RegExp, what: string, timeou
     .toBe(true);
 }
 
-const CONTINUE = /\*\*\*\s*$/m;
+// TSO's continuation marker: a line starting with *** (not Revedit's ******).
+const CONTINUE = /^\s*\*\*\*(\s|$)/m;
 
 /** Log on through a (replayed or live) TK5 logon to the ISPF primary menu, using real keystrokes. */
 export async function logonToIspf(page: Page, user: string, password: string) {
