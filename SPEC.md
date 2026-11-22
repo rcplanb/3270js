@@ -90,9 +90,19 @@ Notes for when it starts:
 - **Documentation:** gather IBM's data-stream manuals for programmed symbols, graphics and image, and record them in an ADR before any design.
 - **A host with GDDM is a hard prerequisite.** MVS 3.8/TK5 has none. Candidates are a licensed OS/390 or VM system (for example the museum's Multiprise 3000), or recorded traces from one.
 
+### Phase 5: File transfer (IND$FILE) — far future _(logged 2026-11-22)_
+
+Send and receive files with the host's `IND$FILE` program, as x3270 and IBM's emulators do:
+
+- **DFT mode:** structured-field transfer, advertised with the DDM Query Reply. 3270js leaves DDM out of its Query Reply until this exists.
+- **CUT mode:** the older transfer through screen writes, for hosts without DFT.
+- **Options:** text or binary, ASCII/EBCDIC and CR/LF translation, and host options (TSO or CMS, `RECFM`, `LRECL`, `BLKSIZE`, `SPACE`).
+- **API:** a browser file picker and download, Node files, and progress and cancel.
+- **Tests:** compare with x3270's transfers. TK5 (MVS 3.8) and OS/390 both provide the host side; check TK5's `IND$FILE` first.
+
 ### Out of scope (for now)
 
-IND$FILE file transfer, printer sessions (LU1/LU3/SCS), DBCS, light pen, and the SimH Assist rename. Graphics have moved to Phase 4.
+Printer sessions (LU1/LU3/SCS), DBCS, light pen, and the SimH Assist rename. Graphics have moved to Phase 4, and file transfer to Phase 5.
 
 ## 3. Architecture
 
