@@ -12,3 +12,4 @@ export { Terminal } from './terminal.js';
 export { parseBind } from './terminal.js';
 export type { BindInfo, SessionMode, TerminalEvents, TerminalOptions } from './terminal.js';
 export type { Transport } from './transport.js';
+export * from './observer/index.js';
