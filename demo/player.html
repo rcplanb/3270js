@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3270js player</title>
+    <link rel="stylesheet" href="fonts/3270.css" />
+    <link rel="stylesheet" href="demo.css" />
+  </head>
+  <body>
+    <header>
+      <h1>3270js <span>session player</span></h1>
+    </header>
+    <section class="controls">
+      <button id="play" type="button" disabled>Play</button>
+      <label
+        >Speed
+        <select id="speed">
+          <option value="0.5">½×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="5">5×</option>
+          <option value="20">20×</option>
+        </select>
+      </label>
+      <input
+        id="seek"
+        type="range"
+        min="0"
+        max="0"
+        value="0"
+        step="1"
+        aria-label="Frame"
+        disabled
+      />
+      <span id="position">–</span>
+      <span class="sep"></span>
+      <label>Open trace <input id="file" type="file" accept=".json,application/json" /></label>
+    </section>
+    <main>
+      <div id="terminal"></div>
+      <p id="status" role="status"></p>
+    </main>
+    <script type="module" src="player.js"></script>
+  </body>
+</html>

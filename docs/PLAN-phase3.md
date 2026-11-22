@@ -194,11 +194,19 @@ Each task is one PR.
       - SimH Assist's asciinema-player 3.17 plays the whole ISPF tour
     - The cast is about twice the trace's size (full repaints); repainting only changed rows could halve it later.
 
-- [ ] **5. Faithful replay player**
+- [x] **5. Faithful replay player**
   - Acceptance:
     - `TracePlayer` plays a trace into a DOM or canvas renderer, with real timing, play/pause, speed and seeking by record.
     - This is the true 3270 view of a recording, for the admin and dashboard pages, next to the asciinema version.
   - Verify: e2e in three browsers × two renderers on a recorded trace.
+  - Done:
+    - `3270js/player` is a new entry point. `TracePlayer(trace, { view, speed, idleLimit })` plays the host's side of a trace into a real `Terminal`, with the recorded timing (long pauses capped). It offers play, pause, speed, `seek(time)` and `seekFrame(n)`. Seeking rebuilds and replays from the start, and re-attaches the view.
+    - `demo/player.html` is a player page:
+      - controls: play/pause, speed, a frame slider
+      - `?trace=` for the committed recordings, which the demo server now serves under `/traces/`
+      - **Open trace** for a local file, read in the browser and never uploaded
+    - Tests: unit tests with fake timers (play, pause, speed, seek back and forward, idle limit); e2e in three browsers × two renderers (play to the end, then seek by content), with screenshot baselines.
+    - Video: the cast from task 4 also goes through SimH Assist's `agg` → `ffmpeg` pipeline to MP4 (checked on the colour ISPF tour).
 
 - [ ] **6. Release v0.1.0 for SimH Assist**
   - Acceptance:
