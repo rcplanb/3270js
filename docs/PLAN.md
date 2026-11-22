@@ -8,7 +8,7 @@ Build from the bottom up: pure, byte-level modules first, then the `Terminal` fa
 
 Two design constraints apply from the start, even though the features they serve come later:
 
-- **Observer mode (Phase 3).** SimH Assist's server-side shadow copy has to parse terminal→host records as well as host→terminal ones. So the inbound record *parser* (not just the generator) is part of Phase 1. The screen model must also accept edits from parsed inbound records, not only from the keyboard.
+- **Observer mode (Phase 3).** SimH Assist's server-side shadow copy has to parse terminal→host records as well as host→terminal ones. So the inbound record _parser_ (not just the generator) is part of Phase 1. The screen model must also accept edits from parsed inbound records, not only from the keyboard.
 - **Extended attributes (Phase 2).** Each buffer cell stores colour, highlighting and character set from day one, even though Phase 1 renders only the basic field attributes.
 
 ## Components and dependencies
@@ -28,24 +28,24 @@ These can be built in parallel once the scaffold exists: **codepage**, **address
 
 ## Checkpoints
 
-| | Gate | Proves |
-|---|---|---|
-| **A** | Core unit suite green (tasks 1–9) | Parser, screen and keyboard match GA23-0059 at the byte level |
-| **B** | A headless Node script logs on to TSO on TK5 through `Terminal` + `TcpTransport` (task 12) | Protocol works against a real host before any UI exists |
-| **C** | s3270 differential suite green on ≥ 20 TK5 screens (task 14) | No subtle divergence from the reference emulator |
-| **D** | Demo: TSO logon → ISPF edit → save → logoff, DOM and canvas, Chrome, Firefox and Safari (task 21) | Phase 1 success criteria (SPEC §10) |
+|       | Gate                                                                                              | Proves                                                        |
+| ----- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **A** | Core unit suite green (tasks 1–9)                                                                 | Parser, screen and keyboard match GA23-0059 at the byte level |
+| **B** | A headless Node script logs on to TSO on TK5 through `Terminal` + `TcpTransport` (task 12)        | Protocol works against a real host before any UI exists       |
+| **C** | s3270 differential suite green on ≥ 20 TK5 screens (task 14)                                      | No subtle divergence from the reference emulator              |
+| **D** | Demo: TSO logon → ISPF edit → save → logoff, DOM and canvas, Chrome, Firefox and Safari (task 21) | Phase 1 success criteria (SPEC §10)                           |
 
 I'll stop for your review at each checkpoint.
 
 ## Risks
 
-| Risk | Mitigation |
-|---|---|
+| Risk                                                                               | Mitigation                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The s3270 differential harness is fiddly, because s3270 needs a host to connect to | Write a tiny Node fake TN3270 server that replays trace records. s3270 connects to it, and we compare its `ReadBuffer` against 3270js. Build it early (task 14) so it guards everything after. |
-| Browser key conflicts (F5 reload, Ctrl+W, Safari's handling of function keys) | Keymap is configurable. Use `preventDefault` only while focused. Test each key per browser in task 21, and document keys that can't be captured, with alternatives. |
-| No font has the OIA glyphs | Research task 17 decides before the canvas work. Fallback: draw the OIA symbols as vector paths in both renderers. |
-| Keyboard edge cases (insert overflow, nulls, wrapping fields) | Behaviour tables in the tests, cross-checked against s3270 by driving its keyboard actions in the differential harness. |
-| TK5 credentials leaking into traces | Recorder redacts non-display field input. A lint check (task 13) fails on known default passwords in `test/traces/`. |
+| Browser key conflicts (F5 reload, Ctrl+W, Safari's handling of function keys)      | Keymap is configurable. Use `preventDefault` only while focused. Test each key per browser in task 21, and document keys that can't be captured, with alternatives.                            |
+| No font has the OIA glyphs                                                         | Research task 17 decides before the canvas work. Fallback: draw the OIA symbols as vector paths in both renderers.                                                                             |
+| Keyboard edge cases (insert overflow, nulls, wrapping fields)                      | Behaviour tables in the tests, cross-checked against s3270 by driving its keyboard actions in the differential harness.                                                                        |
+| TK5 credentials leaking into traces                                                | Recorder redacts non-display field input. A lint check (task 13) fails on known default passwords in `test/traces/`.                                                                           |
 
 ---
 
@@ -146,7 +146,7 @@ Each task is one PR. "Verify" commands assume the scaffold from task 0.
   - Verify: happy-dom unit tests and a Playwright screenshot of three fixture screens
   - Files: `src/renderer/dom/*`, `src/dom.ts`, tests
 
-- [ ] **17. Font and OIA glyph research** *(decision task, no product code)*
+- [ ] **17. Font and OIA glyph research** _(decision task, no product code)_
   - Acceptance: a short ADR in `docs/adr/` choosing the canvas font and how OIA symbols are drawn (font glyphs or vector paths), with licence check. Needs your sign-off.
   - Verify: ADR reviewed
   - Files: `docs/adr/0001-font-and-oia-glyphs.md`

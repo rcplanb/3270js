@@ -21,6 +21,7 @@ That would show a 3270 through a VT100 rendering. Field boundaries, extended col
 ### Key design fact
 
 A 3270 is a **block-mode terminal with local intelligence**, not a stream renderer. The terminal itself:
+
 - owns the field map
 - handles all editing locally
 - locks the keyboard
@@ -102,8 +103,8 @@ term.attach(new DomRenderer(document.getElementById('screen')!));
 await term.connect(new WebSocketTransport('wss://example/tn3270?host=hercules&port=3270'));
 
 term.onKeyboardUnlock(() => console.log(term.screen.toText()));
-term.screen.fields;                   // read-only field list
-term.input.fillField(3, 'HERC01');    // programmatic input
+term.screen.fields; // read-only field list
+term.input.fillField(3, 'HERC01'); // programmatic input
 term.input.aid('ENTER');
 ```
 
@@ -111,21 +112,21 @@ term.input.aid('ENTER');
 
 There is a single npm package, with subpath exports instead of a monorepo:
 
-| Import | Contents |
-|---|---|
-| `3270js` | `Terminal`, core types, code pages |
-| `3270js/dom` | `DomRenderer`, CSS |
-| `3270js/canvas` | `CanvasRenderer` |
-| `3270js/websocket` | `WebSocketTransport` |
-| `3270js/node` | `TcpTransport`, `createWebSocketProxy()` (a small WS↔TCP bridge used by the dev harness and by embedders) |
+| Import             | Contents                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `3270js`           | `Terminal`, core types, code pages                                                                        |
+| `3270js/dom`       | `DomRenderer`, CSS                                                                                        |
+| `3270js/canvas`    | `CanvasRenderer`                                                                                          |
+| `3270js/websocket` | `WebSocketTransport`                                                                                      |
+| `3270js/node`      | `TcpTransport`, `createWebSocketProxy()` (a small WS↔TCP bridge used by the dev harness and by embedders) |
 
 It ships as both ESM and CJS. SimH Assist's browser code imports ESM, and its server code uses `require()`.
 
 ## 4. Tech Stack
 
-- TypeScript 5.x with `strict` and `noUncheckedIndexedAccess`
+- TypeScript 6.0 with `strict`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`. (TypeScript 7 is out, but typescript-eslint supports only versions below 6.1.)
 - **Zero runtime dependencies** in core and the renderers. The `/node` entry may use `ws` as a peer dependency.
-- Node ≥ 20 LTS (local dev is Node 23). Target browsers: current evergreen Chrome, Firefox, Safari and Edge.
+- The library runs on Node ≥ 20. Development needs Node 24 LTS (`.nvmrc`), because Vitest 5 and tsup 9 require it. Target browsers: current evergreen Chrome, Firefox, Safari and Edge.
 - Build: `tsup` (ESM, CJS and `.d.ts`)
 - Test: Vitest, plus `happy-dom` for DOM renderer unit tests, plus Playwright for browser end-to-end and visual tests
 - Lint and format: ESLint (typescript-eslint) and Prettier
@@ -241,6 +242,7 @@ export function decodeAddress(b1: number, b2: number): number {
 ## 10. Success Criteria
 
 **Phase 1 is done when:**
+
 1. Using the demo page with **both** the DOM and canvas renderers against Hercules running TK5, a user can log on to TSO, open ISPF, edit a PDS member, save it, and log off. No visible differences from x3270 on those screens.
 2. All PF1–24, PA1–3, Clear, Reset, Attn and Erase EOF keys work from a standard US keyboard in Chrome, Firefox and Safari.
 3. Differential tests pass on at least 20 recorded TK5 screens (logon, ISPF panels, browse, edit, SDSF or its TK5 equivalent).
@@ -264,7 +266,7 @@ export function decodeAddress(b1: number, b2: number): number {
 
 - RFC 854 / 855 / 856 / 885 / 1091 (telnet, BINARY, EOR, TERMINAL-TYPE)
 - RFC 1576 (TN3270 current practices), RFC 2355 (TN3270E)
-- IBM GA23-0059, *3270 Data Stream Programmer's Reference*
-- IBM GA27-2837, *3174 Functional Description* (keyboard behaviour)
+- IBM GA23-0059, _3270 Data Stream Programmer's Reference_
+- IBM GA27-2837, _3174 Functional Description_ (keyboard behaviour)
 - x3270 / s3270 documentation and behaviour (BSD-licensed, used as the reference oracle)
 - xterm.js (API design inspiration: addons, renderer abstraction, `onX` event style)

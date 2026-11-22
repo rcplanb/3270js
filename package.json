@@ -1,0 +1,108 @@
+{
+  "name": "3270js",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TN3270/TN3270E terminal emulator library for the browser and Node: an xterm.js analogue for IBM 3270",
+  "license": "MIT",
+  "author": "Richard Comish",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcplanb/3270js.git"
+  },
+  "keywords": [
+    "3270",
+    "tn3270",
+    "tn3270e",
+    "terminal",
+    "emulator",
+    "mainframe",
+    "ebcdic",
+    "hercules"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./dom": {
+      "import": {
+        "types": "./dist/dom.d.ts",
+        "default": "./dist/dom.js"
+      },
+      "require": {
+        "types": "./dist/dom.d.cts",
+        "default": "./dist/dom.cjs"
+      }
+    },
+    "./canvas": {
+      "import": {
+        "types": "./dist/canvas.d.ts",
+        "default": "./dist/canvas.js"
+      },
+      "require": {
+        "types": "./dist/canvas.d.cts",
+        "default": "./dist/canvas.cjs"
+      }
+    },
+    "./websocket": {
+      "import": {
+        "types": "./dist/websocket.d.ts",
+        "default": "./dist/websocket.js"
+      },
+      "require": {
+        "types": "./dist/websocket.d.cts",
+        "default": "./dist/websocket.cjs"
+      }
+    },
+    "./node": {
+      "import": {
+        "types": "./dist/node.d.ts",
+        "default": "./dist/node.js"
+      },
+      "require": {
+        "types": "./dist/node.d.cts",
+        "default": "./dist/node.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.core.json",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check:exports": "npm run build && node scripts/check-exports.mjs",
+    "check": "npm run typecheck && npm run lint && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22",
+    "@vitest/coverage-v8": "^5.1.1",
+    "eslint": "^9.39.5",
+    "prettier": "^3.10.1",
+    "tsup": "^9.0.0",
+    "typescript": "~6.0.0",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.1"
+  }
+}
