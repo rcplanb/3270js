@@ -198,6 +198,41 @@ export class Screen {
     this.#version++;
   }
 
+  /**
+   * Store a character but keep the cell's colour, background, highlighting and
+   * transparency (the character set is reset). This is how erase operations
+   * (EUA, EAU, Erase EOF) null cells, matching x3270.
+   */
+  replaceChar(address: number, byte: number): void {
+    const attrs = this.attributesAt(address);
+    this.writeChar(address, byte, { ...attrs, charset: 0 });
+  }
+
+  /**
+   * Change some attributes of an existing field (Modify Field). Attributes not
+   * given keep their current values.
+   */
+  modifyField(
+    address: number,
+    changes: Partial<FieldExtendedAttributes> & { attribute?: number },
+  ): void {
+    if (!this.isFieldAttribute(address)) {
+      throw new Error(`address ${address} is not a field attribute`);
+    }
+    if (changes.attribute !== undefined) {
+      this.#fa[address] = changes.attribute & FieldAttribute.MEANINGFUL;
+    }
+    if (changes.foreground !== undefined) this.#fg[address] = changes.foreground;
+    if (changes.background !== undefined) this.#bg[address] = changes.background;
+    if (changes.highlighting !== undefined) this.#hl[address] = changes.highlighting;
+    if (changes.charset !== undefined) this.#cs[address] = changes.charset;
+    if (changes.transparency !== undefined) this.#tr[address] = changes.transparency;
+    if (changes.validation !== undefined) this.#validation[address] = changes.validation;
+    if (changes.outlining !== undefined) this.#outlining[address] = changes.outlining;
+    this.#fieldsChanged();
+    this.#version++;
+  }
+
   /** Make `address` a field attribute cell (Start Field / Start Field Extended). */
   startField(address: number, attribute: number, ext: Partial<FieldExtendedAttributes> = {}): void {
     this.#check(address);

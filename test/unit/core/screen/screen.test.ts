@@ -161,6 +161,58 @@ describe('Screen', () => {
     });
   });
 
+  describe('replaceChar and modifyField', () => {
+    it('replaceChar keeps colour and highlighting but resets the character set', () => {
+      const s = new Screen(24, 80);
+      s.writeChar(5, 0xc1, {
+        foreground: Color.RED,
+        highlighting: Highlighting.BLINK,
+        charset: 0xf1,
+      });
+      s.replaceChar(5, 0x00);
+      expect(s.charAt(5)).toBe(0);
+      expect(s.attributesAt(5)).toMatchObject({
+        foreground: Color.RED,
+        highlighting: Highlighting.BLINK,
+        charset: 0,
+      });
+    });
+
+    it('modifyField changes only what it is given', () => {
+      const s = new Screen(24, 80);
+      s.startField(10, 0x40, { foreground: Color.GREEN, validation: 0x02 });
+      s.modifyField(10, { attribute: 0x60, highlighting: Highlighting.REVERSE });
+      expect(s.fields[0]).toMatchObject({
+        protected: true,
+        foreground: Color.GREEN,
+        highlighting: Highlighting.REVERSE,
+        validation: 0x02,
+      });
+      s.modifyField(10, {
+        background: Color.BLUE,
+        charset: 0xf1,
+        transparency: 0xf0,
+        outlining: 0x01,
+        foreground: Color.RED,
+        validation: 0,
+      });
+      expect(s.fields[0]).toMatchObject({
+        attribute: 0x20,
+        background: Color.BLUE,
+        charset: 0xf1,
+        transparency: 0xf0,
+        outlining: 0x01,
+        foreground: Color.RED,
+        validation: 0,
+      });
+    });
+
+    it('modifyField refuses non-attribute cells', () => {
+      const s = new Screen(24, 80);
+      expect(() => s.modifyField(3, { attribute: 0x60 })).toThrow(/not a field attribute/);
+    });
+  });
+
   describe('modified data tags', () => {
     it('sets and clears a field’s MDT', () => {
       const s = new Screen(24, 80);
