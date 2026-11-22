@@ -44,5 +44,16 @@ printf 'Connect(<host>:3270)\nWait(30,InputField)\nAscii()\nQuit()\n' | s3270 -m
 - **Why not bake TK5 into the image?** Docker's containerd image store on the
   GPU server lives on a 20 GB root filesystem; a 1 GB+ image filled it.
   Keeping TK5 in a bind mount on `/home` avoids that.
+- **`netbase`** (for `/etc/protocols`) is in the image: without it Hercules
+  logs `getprotobyname("tcp")` errors on every connection. The running
+  container was fixed in place with `docker cp /etc/protocols tk5:/etc/protocols`
+  (no restart); the next `docker compose up -d --build` includes it.
+- Hercules then logs `setsockopt(TCP_KEEPIDLE/KEEPINTVL/KEEPCNT): Invalid
+  argument` per connection: its default keep-alive values are rejected inside
+  the container. Harmless (connections simply have no TCP keep-alive); TK5's
+  config sets no `CONKPALV`. Not pursued, as testing a fix means re-IPLing MVS.
+- Hercules negotiates one TN3270 connection at a time: a client that connects
+  and never answers blocks other connections until it times out.
 - Default TK5 user IDs and passwords are documented in the TK5 user manual.
+  Automated tests use HERC03 (see test/live/README.md).
   Don't commit traces that contain them.

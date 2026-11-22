@@ -11,7 +11,7 @@ LABEL org.opencontainers.image.title="tk5-hercules-runtime" \
       org.opencontainers.image.description="Runtime for MVS 3.8j TK5 on Hercules (3270js test target)" \
       org.opencontainers.image.source="https://github.com/rcplanb/3270js"
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      bash libbz2-1.0 zlib1g libstdc++6 libgcc-s1 procps \
+      bash libbz2-1.0 zlib1g libstdc++6 libgcc-s1 procps netbase \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /tk5
 # 3270 = TN3270 terminal port, 8038 = Hercules HTTP console.
