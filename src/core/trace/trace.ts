@@ -5,6 +5,7 @@
  */
 import { getCodePage } from '../codepage/index.js';
 import { type OutboundGeometry, processOutbound } from '../datastream/index.js';
+import { StructuredFieldId, parseStructuredFields } from '../query/index.js';
 import { MODELS, type ModelNumber, Screen } from '../screen/index.js';
 import { TelnetFramer } from './framer.js';
 import { redactInbound } from './redact.js';
@@ -87,18 +88,58 @@ export function createTraceRecorder(options: TraceRecorderOptions): TraceRecorde
 
   const hidden = (address: number) => shadow.fieldAt(address)?.display === 'hidden';
 
+  // TN3270E (RFC 2355): records carry a 5-byte header. Follow the negotiation
+  // the recorder sees: the terminal's WILL TN3270E starts it, a WONT or DONT
+  // ends it. Records only flow once negotiation is over.
+  let tn3270e = false;
+  const watchTelnet = (bytes: Uint8Array) => {
+    if (bytes[0] !== IAC || bytes[2] !== TELOPT_TN3270E) return;
+    if (bytes[1] === WILL) tn3270e = true;
+    else if (bytes[1] === WONT || bytes[1] === DONT) tn3270e = false;
+  };
+
+  /** Apply a host record to the shadow screen (3270-DATA only in TN3270E). */
+  const follow = (record: Uint8Array) => {
+    let data = record;
+    if (tn3270e) {
+      if (record.length < 5) return;
+      if (record[0] === DT_UNBIND) shadow.clear();
+      if (record[0] !== DT_3270_DATA) return;
+      data = record.subarray(5);
+    }
+    const r = processOutbound(shadow, data, geometry);
+    // Writes carried in structured fields (Outbound 3270DS), as OS/390's ISPF sends.
+    if (!r.structuredFields) return;
+    for (const f of parseStructuredFields(r.structuredFields).fields) {
+      if (f.id === StructuredFieldId.OUTBOUND_3270DS && f.data[0] === 0x00) {
+        processOutbound(shadow, f.data.subarray(1), geometry);
+      }
+    }
+  };
+
+  /** Redact a terminal record, keeping a TN3270E header; only 3270-DATA has fields. */
+  const redact = (record: Uint8Array): Uint8Array => {
+    if (!tn3270e) return redactInbound(record, shadow.size, hidden);
+    if (record.length < 5 || record[0] !== DT_3270_DATA) return record;
+    const body = redactInbound(record.subarray(5), shadow.size, hidden);
+    const out = new Uint8Array(record.length);
+    out.set(record.subarray(0, 5));
+    out.set(body, 5);
+    return out;
+  };
+
   return {
     host(chunk) {
       for (const item of hostFramer.push(chunk)) {
-        if (item.kind === 'record') processOutbound(shadow, item.data, geometry);
+        if (item.kind === 'record') follow(item.data);
+        else watchTelnet(item.data);
         add('host', item.kind, item.data);
       }
     },
     terminal(chunk) {
       for (const item of terminalFramer.push(chunk)) {
-        const data =
-          item.kind === 'record' ? redactInbound(item.data, shadow.size, hidden) : item.data;
-        add('terminal', item.kind, data);
+        if (item.kind === 'telnet') watchTelnet(item.data);
+        add('terminal', item.kind, item.kind === 'record' ? redact(item.data) : item.data);
       }
     },
     attach(source) {
@@ -117,6 +158,14 @@ export function createTraceRecorder(options: TraceRecorderOptions): TraceRecorde
     },
   };
 }
+
+const IAC = 0xff;
+const WILL = 0xfb;
+const WONT = 0xfc;
+const DONT = 0xfe;
+const TELOPT_TN3270E = 40;
+const DT_3270_DATA = 0x00;
+const DT_UNBIND = 0x04;
 
 function toHex(data: Uint8Array): string {
   let s = '';
