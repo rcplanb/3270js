@@ -18,7 +18,7 @@ const PLATFORM_GLOBALS = [
 ].map((name) => ({ name, message: 'src/core must stay platform-neutral.' }));
 
 export default tseslint.config(
-  { ignores: ['dist/', 'coverage/', 'node_modules/', 'infra/'] },
+  { ignores: ['dist/', 'coverage/', 'node_modules/', 'infra/', 'demo/'] },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
@@ -58,6 +58,8 @@ export default tseslint.config(
   },
   {
     files: ['scripts/**'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' } },
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly', URL: 'readonly' },
+    },
   },
 );
