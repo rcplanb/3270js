@@ -245,7 +245,7 @@ can run in parallel with it.
     `?font=0` or a checkbox to turn off; existing e2e baselines pinned to the system
     font, new baselines with the font in three browsers × two renderers.
 
-- [ ] **13. Block (rectangular) selection and copy** _(requested 2026-11-22)_
+- [x] **13. Block (rectangular) selection and copy** _(requested 2026-11-22)_
   - Acceptance:
     - Dragging selects a rectangle of cells, as in PCOMM and other IBM emulators,
       not a run of whole lines; Cmd/Ctrl+C copies it to the system clipboard as one
@@ -257,6 +257,14 @@ can run in parallel with it.
       extends the selection.
   - Verify: unit tests for the selected text; e2e drag-and-copy in all three
     browsers, both renderers, reading the clipboard.
+  - Done: `src/renderer/selection.ts` (`BlockSelector`, `blockRect`, `blockText`)
+    holds the mouse logic and copy for both renderers; the canvas paints the
+    rectangle, the DOM renderer an overlay (its native selection is off).
+    `Renderer` gains `selectionText` and `clearSelection`. The keyboard mapper
+    moves the cursor on mouseup, and only when no block was selected. e2e: a real
+    drag over the ISPF menu and Cmd/Ctrl+C put exactly the block on the clipboard
+    in Chrome, Firefox and WebKit, both renderers; the drag leaves the cursor, a
+    click moves it.
 
 - [ ] **12. Phase 2 acceptance and docs**
   - Acceptance:

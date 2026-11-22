@@ -251,14 +251,15 @@ describe('CanvasRenderer', () => {
     mouse('mousedown', 75, 5); // row 0, col 7 (after the attribute at 0)
     mouse('mousemove', 125, 25); // row 1, col 12
     mouse('mouseup', 125, 25);
-    expect(renderer.selectionText).toBe('WORLD\nLINE TWO');
+    // A block, columns 7-12 of rows 0-1: the hidden "PW" field copies as blanks.
+    expect(renderer.selectionText).toBe('WORLD\nO');
     const data = new Map<string, string>();
     const e = new Event('copy', { bubbles: true, cancelable: true }) as ClipboardEvent;
     Object.defineProperty(e, 'clipboardData', {
       value: { setData: (t: string, v: string) => data.set(t, v) },
     });
     renderer.element.dispatchEvent(e);
-    expect(data.get('text/plain')).toBe('WORLD\nLINE TWO');
+    expect(data.get('text/plain')).toBe('WORLD\nO');
     expect(e.defaultPrevented).toBe(true);
     renderer.clearSelection();
     expect(renderer.selectionText).toBe('');
@@ -273,10 +274,12 @@ describe('CanvasRenderer', () => {
     } as DOMRect);
     expect(renderer.cellAt(35, 45)).toEqual({ row: 2, col: 3 });
     expect(renderer.cellAt(-1, 5)).toBeUndefined();
-    renderer.element.dispatchEvent(
-      new MouseEvent('mousedown', { clientX: 35, clientY: 45, button: 0, bubbles: true }),
-    );
-    expect(term.screen.cursor).toBe(163);
+    for (const type of ['mousedown', 'mouseup']) {
+      renderer.canvas.dispatchEvent(
+        new MouseEvent(type, { clientX: 35, clientY: 45, button: 0, bubbles: true }),
+      );
+    }
+    expect(term.screen.cursor).toBe(163); // a click, not a drag: the cursor moves
     mapper.dispose();
   });
 

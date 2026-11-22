@@ -138,7 +138,11 @@ export class KeyboardMapper {
       this.#input();
     });
     on(renderer.element, 'focus', () => ta.focus());
-    on(renderer.element, 'mousedown', (e) => this.#click(e));
+    // Click to move the cursor, on mouseup: a drag selects a block instead.
+    on(renderer.element, 'mousedown', (e) => {
+      if (e.button === 0 && this.#renderer.cellAt(e.clientX, e.clientY)) e.preventDefault();
+    });
+    on(renderer.element, 'mouseup', (e) => this.#click(e));
   }
 
   focus(): void {
@@ -195,6 +199,8 @@ export class KeyboardMapper {
     const cell = this.#renderer.cellAt(e.clientX, e.clientY);
     if (!cell) return;
     e.preventDefault();
+    this.textarea.focus();
+    if (this.#renderer.selectionText) return; // the mouse selected a block
     this.#term.moveCursor(cell.row * this.#term.screen.cols + cell.col);
     this.textarea.focus();
   }

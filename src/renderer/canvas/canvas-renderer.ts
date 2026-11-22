@@ -7,6 +7,7 @@
 import type { OiaState } from '../../core/oia/index.js';
 import type { Terminal } from '../../core/terminal.js';
 import { type DisplayMode, rowRuns, OUTLINE } from '../cell-style.js';
+import { BlockSelector } from '../selection.js';
 import { DOM_CSS } from '../dom/styles.js';
 import { OIA_GLYPHS, OIA_GLYPH_SIZE, type OiaGlyph } from '../oia-glyphs.js';
 import { oiaCells, oiaDescription } from '../oia-layout.js';
@@ -20,12 +21,6 @@ export interface CanvasRendererOptions extends RendererOptions {
   lineHeight?: number;
   /** Device pixel ratio; default window.devicePixelRatio. */
   pixelRatio?: number;
-}
-
-interface Selection {
-  /** Inclusive cell coordinates, normalised so a <= b. */
-  a: { row: number; col: number };
-  b: { row: number; col: number };
 }
 
 const BLINK_MS = 600;
@@ -52,8 +47,7 @@ export class CanvasRenderer implements Renderer {
   #blinkTimer: ReturnType<typeof setInterval> | undefined;
   #blinkRows = new Set<number>();
   #cursorRow = -1;
-  #selection: Selection | undefined;
-  #dragFrom: { row: number; col: number } | undefined;
+  #selector: BlockSelector | undefined;
   #listeners: (() => void)[] = [];
 
   constructor(container: HTMLElement, options: CanvasRendererOptions = {}) {
@@ -154,28 +148,13 @@ export class CanvasRenderer implements Renderer {
     this.element.remove();
   }
 
-  /** The selected text, rows separated by newlines (non-display fields blank). */
+  /** The selected block's text, one line per row (non-display fields blank). */
   get selectionText(): string {
-    const sel = this.#selection;
-    const term = this.#term;
-    if (!sel || !term) return '';
-    const lines = term.text.slice(sel.a.row, sel.b.row + 1);
-    return lines
-      .map((line, i) => {
-        const r = sel.a.row + i;
-        const from = r === sel.a.row ? sel.a.col : 0;
-        const to = r === sel.b.row ? sel.b.col + 1 : line.length;
-        return line.slice(from, to).trimEnd();
-      })
-      .join('\n');
+    return this.#selector?.text ?? '';
   }
 
   clearSelection(): void {
-    if (!this.#selection) return;
-    const { a, b } = this.#selection;
-    this.#selection = undefined;
-    for (let r = a.row; r <= b.row; r++) this.#paintRow(r);
-    this.#paintCursor();
+    this.#selector?.clear();
   }
 
   get #mode(): DisplayMode {
@@ -273,12 +252,15 @@ export class CanvasRenderer implements Renderer {
   }
 
   #paintSelection(r: number): void {
-    const sel = this.#selection;
-    if (!sel || r < sel.a.row || r > sel.b.row) return;
-    const from = r === sel.a.row ? sel.a.col : 0;
-    const to = r === sel.b.row ? sel.b.col + 1 : this.#cols;
+    const sel = this.#selector?.rect;
+    if (!sel || r < sel.top || r > sel.bottom) return;
     this.#ctx.fillStyle = 'rgba(95, 135, 255, 0.35)';
-    this.#ctx.fillRect(from * this.#cw, r * this.#ch, (to - from) * this.#cw, this.#ch);
+    this.#ctx.fillRect(
+      sel.left * this.#cw,
+      r * this.#ch,
+      (sel.right - sel.left + 1) * this.#cw,
+      this.#ch,
+    );
   }
 
   #paintCursor(): void {
@@ -369,10 +351,6 @@ export class CanvasRenderer implements Renderer {
     return { row, col };
   }
 
-  #cellAt(e: MouseEvent): { row: number; col: number } | undefined {
-    return this.cellAt(e.clientX, e.clientY);
-  }
-
   #listen(): void {
     // Any other web font finishing later: measure again and repaint.
     const fonts = this.#doc.fonts as FontFaceSet | undefined;
@@ -381,45 +359,21 @@ export class CanvasRenderer implements Renderer {
       fonts.addEventListener('loadingdone', relayout);
       this.#listeners.push(() => fonts.removeEventListener('loadingdone', relayout));
     }
-    const on = <K extends keyof HTMLElementEventMap>(
-      el: HTMLElement,
-      type: K,
-      fn: (e: HTMLElementEventMap[K]) => void,
-    ) => {
-      el.addEventListener(type, fn);
-      this.#listeners.push(() => el.removeEventListener(type, fn));
-    };
-    on(this.canvas, 'mousedown', (e) => {
-      if (e.button !== 0) return;
-      this.clearSelection();
-      this.#dragFrom = this.#cellAt(e);
+    const selector = new BlockSelector({
+      target: this.canvas,
+      copyTarget: this.element,
+      cellAt: (x, y) => this.cellAt(x, y),
+      lines: () => this.#term?.text,
+      changed: (next, old) => {
+        if (!this.#term) return;
+        const rows = new Set<number>();
+        for (const r of [old, next]) if (r) for (let i = r.top; i <= r.bottom; i++) rows.add(i);
+        for (const r of rows) if (r < this.#rows) this.#paintRow(r);
+        this.#paintCursor();
+      },
     });
-    on(this.canvas, 'mousemove', (e) => {
-      if (!this.#dragFrom || (e.buttons & 1) === 0) return;
-      const to = this.#cellAt(e);
-      if (!to) return;
-      const old = this.#selection;
-      const [a, b] =
-        to.row < this.#dragFrom.row ||
-        (to.row === this.#dragFrom.row && to.col < this.#dragFrom.col)
-          ? [to, this.#dragFrom]
-          : [this.#dragFrom, to];
-      this.#selection = { a, b };
-      const rows = new Set<number>();
-      for (const s of [old, this.#selection]) {
-        if (s) for (let r = s.a.row; r <= s.b.row; r++) rows.add(r);
-      }
-      for (const r of rows) this.#paintRow(r);
-      this.#paintCursor();
-    });
-    on(this.canvas, 'mouseup', () => (this.#dragFrom = undefined));
-    // Cmd/Ctrl+C in the focused input element bubbles a copy event to us.
-    on(this.element, 'copy', (e) => {
-      const text = this.selectionText;
-      if (!text) return;
-      e.clipboardData?.setData('text/plain', text);
-      e.preventDefault();
-    });
+    this.#selector = selector;
+    this.#listeners.push(() => selector.dispose());
   }
 }
 
