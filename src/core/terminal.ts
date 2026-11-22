@@ -156,6 +156,12 @@ export class Terminal {
     return result;
   }
 
+  /** Move the cursor (e.g. on a mouse click), as the cursor-select keys of a real terminal do. */
+  moveCursor(address: number): void {
+    this.screen.cursor = address;
+    this.#refresh(false);
+  }
+
   /** Press an AID key: Enter, Clear, PA1–3, PF1–24, SysReq. */
   aid(key: AidKey): KeyResult {
     return this.press({ type: 'aid', key });
