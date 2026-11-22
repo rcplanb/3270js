@@ -97,7 +97,8 @@
     "test:live": "vitest run --config vitest.live.config.ts",
     "check:traces": "node scripts/check-traces.mjs",
     "dev": "tsup && node scripts/dev.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:live": "playwright test --config playwright.live.config.ts"
   },
   "peerDependencies": {
     "ws": "^8.0.0"
