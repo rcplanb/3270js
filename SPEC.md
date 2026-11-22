@@ -34,7 +34,8 @@ So 3270js is a complete terminal emulator. Its core is a headless state machine,
 
 ### Phase 1: Core MVP (TN3270, model 2)
 
-- **Telnet:** negotiate BINARY, TERMINAL-TYPE and EOR. Announce `IBM-3278-2` (monochrome) or `IBM-3279-2` (colour). **Not** the `-E` (extended data stream) types: hosts answer `-E` with a Read Partition Query, which needs Query Reply (Phase 2). TK5 does this as soon as you leave the logon screen. _(Decided at checkpoint A, 2026-11-22.)_ Frame records with `IAC EOR` and handle IAC doubling.
+- **Telnet:** negotiate BINARY, TERMINAL-TYPE and EOR. Announce `IBM-3278-2-E` (monochrome) or `IBM-3279-2-E` (colour); `extendedDataStream: false` drops the `-E`. Frame records with `IAC EOR` and handle IAC doubling.
+- **Query Reply** _(moved from Phase 2 at checkpoint B, 2026-11-22)_. TK5's TSO only accepts `-E` terminals and sends them Read Partition Query. A plain `IBM-3278-2` gets `IKT00405I SCREEN ERASURE CAUSED BY ERROR RECOVERY PROCEDURE` in a loop; s3270 behaves the same. So Phase 1 answers Read Partition Query and Query List with Summary, Usable Area, Alphanumeric Partitions, Character Sets, Color, Highlighting, Reply Modes (field mode only) and Implicit Partition. Each was checked byte for byte against s3270. The Color reply describes a green-only 3278 unless `color` is on. _(This reverses the checkpoint A decision to announce plain `IBM-3278-2`, which rested on the wrong assumption that dropping `-E` avoids the query.)_
 - **Commands:** W, EW, EWA, EAU, WSF, RB, RM, RMA, accepting both the local (0xF1 …) and SNA (0x01 …) codes.
 - **WCC:** reset, sound alarm, keyboard restore, reset MDT.
 - **Orders:** SF, SBA, IC, PT, RA, EUA, plus SFE, SA and MF (parsed and stored even before rendering supports every attribute). GE is parsed and its character stored.
@@ -50,10 +51,9 @@ So 3270js is a complete terminal emulator. Its core is a headless state machine,
 ### Phase 2: TN3270E and extended data stream
 
 - TN3270E negotiation (RFC 2355): DEVICE-TYPE, CONNECT to a named LU, and the FUNCTIONS subnegotiation (BIND-IMAGE, RESPONSES, SYSREQ). Handle the 5-byte header.
-- Read Partition Query and Query List. Query Replies: Summary, Usable Area, Color, Highlighting, Reply Modes, Implicit Partition and Character Sets.
+- Query Reply extensions: character and extended-field reply modes (Set Reply Mode), and other Read Partition types.
 - Extended attributes rendered: 7-colour 3279, highlighting (blink, reverse, underscore), field outlining, and character attribute (SA) overrides.
 - **Colour/monochrome setting** _(requested 2026-11-22)_. `Terminal` option `color: boolean` chooses the terminal family, as the 3278/3279 split does: monochrome announces `IBM-3278-n[-E]`, colour announces `IBM-3279-n[-E]`. Query Reply advertises colour only when it is on. It is fixed for the life of a connection, as on real hardware. Renderers also get a live display switch (`displayMode: 'color' | 'monochrome'`), like the colour/mono switch on some models. With colour on and no extended colour from the host, fields get 3279 base-colour mapping (protected/intensified → blue, red, green, white).
-- Default terminal type becomes `IBM-3279-2-E` once Query Reply exists.
 - Models 3, 4 and 5, and default/alternate screen size switching via EWA.
 - More code pages: 1047, 500, 285 and 1140.
 

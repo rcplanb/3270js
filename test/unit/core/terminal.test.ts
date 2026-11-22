@@ -24,7 +24,7 @@ describe('Terminal', () => {
   describe('configuration', () => {
     it('defaults to a monochrome model 2 with CP037', () => {
       const t = new Terminal();
-      expect(t.terminalType).toBe('IBM-3278-2');
+      expect(t.terminalType).toBe('IBM-3278-2-E');
       expect(t.model).toBe(2);
       expect(t.color).toBe(false);
       expect(t.codePage.id).toBe('cp037');
@@ -32,8 +32,9 @@ describe('Terminal', () => {
     });
 
     it('announces a 3279 when colour is on, and other models', () => {
-      expect(new Terminal({ color: true }).terminalType).toBe('IBM-3279-2');
-      expect(new Terminal({ model: 5 }).terminalType).toBe('IBM-3278-5');
+      expect(new Terminal({ color: true }).terminalType).toBe('IBM-3279-2-E');
+      expect(new Terminal({ model: 5 }).terminalType).toBe('IBM-3278-5-E');
+      expect(new Terminal({ extendedDataStream: false }).terminalType).toBe('IBM-3278-2');
       expect(new Terminal({ terminalType: 'IBM-DYNAMIC' }).terminalType).toBe('IBM-DYNAMIC');
     });
 
@@ -56,7 +57,7 @@ describe('Terminal', () => {
       host.write('fffd18');
       host.write('fffa1801fff0');
       expect(host.takeSent()).toBe(
-        'fffb18' + 'fffa1800' + Buffer.from('IBM-3278-2').toString('hex') + 'fff0',
+        'fffb18' + 'fffa1800' + Buffer.from('IBM-3278-2-E').toString('hex') + 'fff0',
       );
       for (const c of HERCULES_NEGOTIATION.slice(2)) host.write(c);
       await expect(ready).resolves.toBeUndefined();
@@ -206,12 +207,35 @@ describe('Terminal', () => {
       expect(term.text[0]!.startsWith('A')).toBe(true);
     });
 
-    it('reports structured fields as unsupported', async () => {
+    it('answers Read Partition Query (what TSO sends) with a Query Reply', async () => {
+      const { term, host } = await connected();
+      host.write(frame('f5c3'));
+      host.write(frame('f3000501ff02'));
+      const sent = host.takeSent();
+      expect(sent.startsWith('88000c8180')).toBe(true); // AID X'88', Summary first
+      expect(sent.endsWith('ffef')).toBe(true);
+      expect(term.keyboard.isLocked).toBe(false);
+      host.write(frame('f3000501ff03')); // Query List
+      expect(host.takeSent().startsWith('88')).toBe(true);
+    });
+
+    it('describes the model’s alternate size in the Query Reply', async () => {
+      const { host } = await connected({ model: 5 });
+      host.write(frame('f3000501ff02'));
+      expect(host.takeSent()).toContain('818101000084001b'); // Usable Area: 132 × 27
+    });
+
+    it('reports other structured fields as unsupported', async () => {
       const { term, host } = await connected();
       const errors: string[] = [];
       term.on('error', (e) => errors.push(e.message));
-      host.write(frame('f3000501ff02'));
-      expect(errors[0]).toMatch(/structured field/i);
+      host.write(frame('f3000400ff' + '000501fff2' + '0001'));
+      expect(errors).toEqual([
+        'bad structured field length 1', // parse problems are reported first
+        "unsupported structured field X'00'; ignored",
+        "unsupported structured field X'01' type X'F2'; ignored",
+      ]);
+      expect(host.takeSent()).toBe('');
     });
 
     it('passes NVT data through', () => {

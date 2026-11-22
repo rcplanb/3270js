@@ -13,6 +13,12 @@ import {
   type KeyResult,
 } from './keyboard/index.js';
 import { OiaModel, type ConnectionState, type OiaState } from './oia/index.js';
+import {
+  ReadPartitionType,
+  StructuredFieldId,
+  buildQueryReply,
+  parseStructuredFields,
+} from './query/index.js';
 import { MODELS, type ModelNumber, Screen } from './screen/index.js';
 import { createTelnetSession, type TelnetSession } from './telnet/index.js';
 import type { Transport } from './transport.js';
@@ -25,6 +31,12 @@ export interface TerminalOptions {
    * the host and is fixed for the life of a connection. Default false.
    */
   color?: boolean;
+  /**
+   * Announce extended data stream support (the `-E` suffix) and answer the
+   * host's Read Partition Query. Default true: TK5's TSO only accepts `-E`
+   * terminals. Set false for a plain 3278/3279.
+   */
+  extendedDataStream?: boolean;
   /** Override the announced terminal type entirely. */
   terminalType?: string;
   /** Code page id or object. Default `cp037`. */
@@ -75,7 +87,9 @@ export class Terminal {
   constructor(options: TerminalOptions = {}) {
     this.model = options.model ?? 2;
     this.color = options.color ?? false;
-    this.terminalType = options.terminalType ?? `IBM-${this.color ? 3279 : 3278}-${this.model}`;
+    const suffix = (options.extendedDataStream ?? true) ? '-E' : '';
+    this.terminalType =
+      options.terminalType ?? `IBM-${this.color ? 3279 : 3278}-${this.model}${suffix}`;
     const requested = options.codePage ?? 'cp037';
     const cp = typeof requested === 'object' ? requested : getCodePage(requested);
     if (!cp)
@@ -222,11 +236,7 @@ export class Terminal {
           : readModified(this.screen, this.#lastAid, { all: r.read === 'modifiedAll' });
       this.#sendRecord(reply);
     }
-    if (r.structuredFields) {
-      this.#events.emit('error', {
-        message: 'structured fields (WSF) are not supported yet; ignored',
-      });
-    }
+    if (r.structuredFields) this.#structuredFields(r.structuredFields);
     const isWrite =
       r.command === 'W' || r.command === 'EW' || r.command === 'EWA' || r.command === 'EAU';
     if (isWrite) {
@@ -235,6 +245,27 @@ export class Terminal {
     }
     if (r.alarm) this.#events.emit('alarm', undefined);
     return isWrite;
+  }
+
+  /** Write Structured Field. Phase 1 answers Read Partition Query / Query List. */
+  #structuredFields(payload: Uint8Array): void {
+    const { fields, errors } = parseStructuredFields(payload);
+    for (const message of errors) this.#events.emit('error', { message });
+    for (const f of fields) {
+      const type = f.data[1];
+      if (
+        f.id === StructuredFieldId.READ_PARTITION &&
+        (type === ReadPartitionType.QUERY || type === ReadPartitionType.QUERY_LIST)
+      ) {
+        const { rows, cols } = this.#geometry.alternate;
+        this.#sendRecord(buildQueryReply({ rows, cols, color: this.color }));
+      } else {
+        const hex = (n: number | undefined) => (n ?? 0).toString(16).toUpperCase().padStart(2, '0');
+        this.#events.emit('error', {
+          message: `unsupported structured field X'${hex(f.id)}'${f.id === StructuredFieldId.READ_PARTITION ? ` type X'${hex(type)}'` : ''}; ignored`,
+        });
+      }
+    }
   }
 
   #closed(reason?: string): void {

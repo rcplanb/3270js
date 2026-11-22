@@ -4,6 +4,7 @@ export * from './datastream/index.js';
 export * from './inbound/index.js';
 export * from './keyboard/index.js';
 export * from './oia/index.js';
+export * from './query/index.js';
 export * from './screen/index.js';
 export * from './telnet/index.js';
 export { Terminal } from './terminal.js';
