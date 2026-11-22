@@ -9,3 +9,5 @@ export { oiaCells, oiaDescription } from './oia-layout.js';
 export type { OiaCell, OiaLayoutOptions } from './oia-layout.js';
 export { DEFAULT_KEYMAP, KeyboardMapper, comboOf } from './keymap.js';
 export type { KeyBinding, Keymap, KeyboardMapperOptions } from './keymap.js';
+export { BlockSelector, blockRect, blockText } from './selection.js';
+export type { BlockRect, BlockSelectorHost, CellPosition } from './selection.js';

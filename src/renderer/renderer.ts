@@ -35,6 +35,10 @@ export interface Renderer {
   setShift(down: boolean): void;
   /** The screen cell under a point in client coordinates, if any (for mouse input). */
   cellAt(clientX: number, clientY: number): { row: number; col: number } | undefined;
+  /** The selected block's text, one line per row ('' when nothing is selected). */
+  readonly selectionText: string;
+  /** Clear the block selection. */
+  clearSelection(): void;
   /** Size of one character cell, once known. */
   readonly cellMetrics: CellMetrics | undefined;
   /** The element that should receive keyboard focus. */

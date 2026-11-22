@@ -10,7 +10,12 @@ export const DOM_CSS = `
   cursor: text;
 }
 .t3270:focus-visible { box-shadow: 0 0 0 2px var(--t3270-cursor); }
-.t3270-screen { position: relative; }
+.t3270-screen { position: relative; user-select: none; -webkit-user-select: none; }
+.t3270-selection {
+  position: absolute;
+  background: rgba(95, 135, 255, 0.35);
+  pointer-events: none;
+}
 .t3270-row {
   height: var(--t3270-line);
   line-height: var(--t3270-line);

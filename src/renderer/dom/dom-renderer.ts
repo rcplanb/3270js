@@ -1,12 +1,14 @@
 /**
  * DomRenderer: draws a Terminal with ordinary DOM elements. Each row is a
- * block element of styled spans, so text selection and copy work natively and
- * the screen is readable by assistive technology. Only changed rows are
- * repainted.
+ * block element of styled spans, so the screen is readable by assistive
+ * technology. Selection is a block (BlockSelector) drawn as an overlay, as in
+ * IBM's emulators; the browser's own line-flow selection is off. Only changed
+ * rows are repainted.
  */
 import type { OiaLockSymbol, OiaState } from '../../core/oia/index.js';
 import type { Terminal } from '../../core/terminal.js';
 import { type DisplayMode, type Run, rowRuns, OUTLINE } from '../cell-style.js';
+import { BlockSelector, type BlockRect } from '../selection.js';
 import type { CellMetrics, Renderer, RendererOptions } from '../renderer.js';
 import { OIA_GLYPHS, OIA_GLYPH_SIZE } from '../oia-glyphs.js';
 import { type OiaCell, oiaCells, oiaDescription } from '../oia-layout.js';
@@ -43,6 +45,8 @@ export class DomRenderer implements Renderer {
   #displayMode: DisplayMode | undefined;
   #term: Terminal | undefined;
   #unsubscribe: (() => void)[] = [];
+  readonly #selectionEl: HTMLElement;
+  readonly #selector: BlockSelector;
 
   constructor(container: HTMLElement, options: RendererOptions = {}) {
     this.#doc = container.ownerDocument;
@@ -82,9 +86,38 @@ export class DomRenderer implements Renderer {
     this.#liveEl.setAttribute('aria-live', 'polite');
     this.#liveEl.setAttribute('aria-atomic', 'true');
 
-    this.#screenEl.append(this.#cursorEl);
+    // Block selection: the browser's own selection can only follow lines.
+    this.#selectionEl = el('t3270-selection');
+    this.#selectionEl.hidden = true;
+    this.#screenEl.append(this.#cursorEl, this.#selectionEl);
     this.element.append(this.#screenEl, this.#oiaEl, this.#oiaTextEl, this.#liveEl);
     container.append(this.element);
+    this.#selector = new BlockSelector({
+      target: this.element,
+      copyTarget: this.element,
+      cellAt: (x, y) => this.cellAt(x, y),
+      lines: () => this.#term?.text,
+      changed: (next) => this.#paintSelection(next),
+    });
+  }
+
+  /** The selected block's text, one line per row (non-display fields blank). */
+  get selectionText(): string {
+    return this.#selector.text;
+  }
+
+  clearSelection(): void {
+    this.#selector.clear();
+  }
+
+  #paintSelection(r: BlockRect | undefined): void {
+    const s = this.#selectionEl;
+    s.hidden = !r;
+    if (!r) return;
+    s.style.left = `${r.left}ch`;
+    s.style.width = `${r.right - r.left + 1}ch`;
+    s.style.top = `calc(${r.top} * var(--t3270-line))`;
+    s.style.height = `calc(${r.bottom - r.top + 1} * var(--t3270-line))`;
   }
 
   get cellMetrics(): CellMetrics | undefined {
@@ -154,6 +187,7 @@ export class DomRenderer implements Renderer {
 
   dispose(): void {
     this.detach();
+    this.#selector.dispose();
     this.element.remove();
   }
 
