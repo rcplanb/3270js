@@ -7,6 +7,7 @@ export default defineConfig({
     canvas: 'src/canvas.ts',
     websocket: 'src/websocket.ts',
     node: 'src/node.ts',
+    script: 'src/script.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

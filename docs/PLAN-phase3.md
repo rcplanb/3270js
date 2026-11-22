@@ -130,7 +130,7 @@ Each task is one PR.
     - Readiness is the keyboard lock, plus the observer's `ready` quiet period.
     - Tested on the recorded TK5 logon and ISPF tour, OS/390's USS screen, and a synthetic OS/390-style ISPF menu.
 
-- [ ] **2. Public scripting helper (`3270js/script`)**
+- [x] **2. Public scripting helper (`3270js/script`)**
   - Acceptance:
     - `waitFor(matcher, timeout)`, `fill(labelOrIndex, text)`, `press(aid)` and `command(text)`.
     - TSO and ISPF recovery helpers, promoted from `test/live/tso.ts`:
@@ -141,6 +141,12 @@ Each task is one PR.
       - `***` paging
     - Works on a `Terminal` (Node, or the browser).
   - Verify: the live tests are rewritten on top of it and still pass on TK5.
+  - Done:
+    - `3270js/script` is a new entry point outside the platform-neutral core, because it uses timers.
+    - `Session` gives `waitFor` (a screen kind, text, a regex or a matcher), `type`, `fill` (by index or label), `press`, `command` (using the recognised command line, and RFE's Scroll field) and `pageThrough`.
+    - TSO helpers: `waitForLogonScreen`, `tsoLogon` (which reports `reconnected`), `toIspfPrimary` and `tsoLogoff`.
+    - Unit tests replay recorded TK5 sessions interactively (`test/helpers/replay-driver.ts`); the helpers send exactly the recorded records.
+    - The live tests run on it, 9/9 on TK5, and a new live test checks the reconnect recovery on purpose.
 
 - [ ] **3. Docent actions**
   - Acceptance:
