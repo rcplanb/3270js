@@ -3,7 +3,7 @@
  * after each host write. The terminal side is not replayed: the host's bytes
  * were recorded, so the terminal's replies don't change them.
  */
-import { Terminal, type TerminalOptions } from '../terminal.js';
+import { type BindInfo, type SessionMode, Terminal, type TerminalOptions } from '../terminal.js';
 import type { Transport } from '../transport.js';
 import { type Trace, type TraceScreen, fromHex } from './trace.js';
 
@@ -15,6 +15,12 @@ export interface ReplayResult {
   /** The screen after each host record. */
   screens: TraceScreen[];
   final: TraceScreen;
+  /** Session state at the end of the trace, before the replay disconnects. */
+  session: {
+    tn3270e?: { deviceType: string; luName?: string; functions: number[] };
+    mode: SessionMode;
+    bind?: BindInfo;
+  };
 }
 
 export function replayTrace(trace: Trace, options: TerminalOptions = {}): ReplayResult {
@@ -38,8 +44,15 @@ export function replayTrace(trace: Trace, options: TerminalOptions = {}): Replay
     transport.deliver(e.kind === 'record' ? frame(data) : data);
     if (e.kind === 'record') screens.push(snapshot());
   }
+  const tn3270e = terminal.tn3270e;
+  const bind = terminal.bindInfo;
+  const session = {
+    mode: terminal.sessionMode,
+    ...(tn3270e ? { tn3270e } : {}),
+    ...(bind ? { bind } : {}),
+  };
   transport.close();
-  return { terminal, screens, final: snapshot() };
+  return { terminal, screens, final: snapshot(), session };
 }
 
 function frame(record: Uint8Array): Uint8Array {

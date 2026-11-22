@@ -62,11 +62,6 @@ const t3270js: ClientFactory = {
   name: '3270js',
   available: true,
   pending: {
-    'ignores 3270 data until BIND': 'task 2',
-    'sends a positive response when asked ALWAYS-RESPONSE': 'task 2',
-    'sends a negative response for a bad buffer address': 'task 2',
-    'shows SSCP-LU data and sends input back as SSCP-LU data': 'task 2',
-    'clears the screen on UNBIND': 'task 2',
     'sends Attn as IAC IP and SysReq as IAC AO': 'task 4',
   },
   create() {

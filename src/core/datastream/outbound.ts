@@ -48,11 +48,24 @@ export interface OutboundResult {
   structuredFields?: Uint8Array;
   /** Problems that stopped processing. Changes made before them are kept. */
   errors: string[];
+  /**
+   * How a real terminal would report the first error: an invalid buffer
+   * address is an operation check, anything else a command reject. TN3270E
+   * sends this as a negative response (RFC 2355 §10.4.1).
+   */
+  sense?: 'commandReject' | 'operationCheck';
   /** Problems that were skipped over. */
   warnings: string[];
 }
 
-class AbortWrite extends Error {}
+class AbortWrite extends Error {
+  constructor(
+    message: string,
+    readonly sense: 'commandReject' | 'operationCheck' = 'commandReject',
+  ) {
+    super(message);
+  }
+}
 
 export function processOutbound(
   screen: Screen,
@@ -68,6 +81,7 @@ export function processOutbound(
   };
   if (record.length === 0) {
     result.errors.push('empty record');
+    result.sense = 'commandReject';
     return result;
   }
   const kind = commandKind(record[0]!);
@@ -75,6 +89,7 @@ export function processOutbound(
   switch (kind) {
     case undefined:
       result.errors.push(`unknown command X'${hex(record[0]!)}'`);
+      result.sense = 'commandReject';
       break;
     case 'EW':
     case 'EWA': {
@@ -118,6 +133,7 @@ export function processOutbound(
 function write(screen: Screen, rec: Uint8Array, result: OutboundResult): void {
   if (rec.length < 2) {
     result.errors.push('record too short: missing WCC');
+    result.sense = 'commandReject';
     return;
   }
   const wcc = decodeWcc(rec[1]!);
@@ -146,7 +162,8 @@ function write(screen: Screen, rec: Uint8Array, result: OutboundResult): void {
   const address = (i: number, order: string): number => {
     need(i, 2, `${order} address`);
     const a = decodeAddress(rec[i + 1]!, rec[i + 2]!);
-    if (a >= size) throw new AbortWrite(`${order} address ${a} > maximum ${size - 1}`);
+    if (a >= size)
+      throw new AbortWrite(`${order} address ${a} > maximum ${size - 1}`, 'operationCheck');
     return a;
   };
   const isProtectedAt = (a: number): boolean => screen.fieldAt(a)?.protected ?? false;
@@ -331,6 +348,7 @@ function write(screen: Screen, rec: Uint8Array, result: OutboundResult): void {
   } catch (e) {
     if (!(e instanceof AbortWrite)) throw e;
     result.errors.push(e.message);
+    result.sense ??= e.sense;
   }
 
   // These apply even after an aborted write, as on a real terminal.

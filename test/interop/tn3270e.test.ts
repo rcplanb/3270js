@@ -165,6 +165,31 @@ describe.each(CLIENTS)('TN3270E interop: $name', (factory) => {
     expect([...r.record.data]).toEqual([0x00]); // device end
   });
 
+  it.skipIf(!available)(
+    "answers OS/390 ISPF's Outbound 3270DS + Query with a response, then the Query Reply",
+    async () => {
+      const s = await session();
+      s.bind();
+      s.send3270(HELLO);
+      await settle();
+      // Recorded from OS/390 2.10 ISPF: WSF { Outbound 3270DS: W, WCC restore } { Read Partition Query }.
+      const seq = s.send3270(
+        [0xf3, 0x00, 0x06, 0x40, 0x00, 0xf1, 0xc3, 0x00, 0x05, 0x01, 0xff, 0x02],
+        ResponseFlag.ALWAYS_RESPONSE,
+      );
+      await s.waitFor(() => s.events.filter(isRecord).length === 2);
+      const [response, reply] = s.events.filter(isRecord);
+      expect(response!.record.header).toEqual({
+        dataType: DataType.RESPONSE,
+        requestFlag: 0,
+        responseFlag: 0,
+        seq,
+      });
+      expect(reply!.record.header?.dataType).toBe(DataType.DATA_3270);
+      expect(reply!.record.data[0]).toBe(0x88); // Query Reply AID
+    },
+  );
+
   it.skipIf(!available)('sends a negative response for a bad buffer address', async () => {
     const s = await session();
     s.bind();

@@ -3,7 +3,9 @@
  * OIA together over a Transport. This is the main public API of the core.
  */
 import { type CodePage, getCodePage } from './codepage/index.js';
-import { type OutboundGeometry, processOutbound } from './datastream/index.js';
+import { type OutboundGeometry, type OutboundResult, processOutbound } from './datastream/index.js';
+
+type OutboundSense = NonNullable<OutboundResult['sense']>;
 import { Emitter } from './events.js';
 import { Aid, aidForKey, type AidKey, readBuffer, readModified } from './inbound/index.js';
 import {
@@ -20,8 +22,11 @@ import {
   parseStructuredFields,
 } from './query/index.js';
 import { MODELS, type ModelNumber, Screen } from './screen/index.js';
+import { readSscpLu, writeSscpLu } from './sscp.js';
 import {
   Tn3270eDataType,
+  Tn3270eFunction,
+  Tn3270eResponseFlag,
   createTelnetSession,
   type TelnetSession,
   type Tn3270eHeader,
@@ -61,6 +66,10 @@ export interface TerminalEvents {
   connect: undefined;
   /** TN3270E negotiation completed. */
   tn3270e: { deviceType: string; luName?: string; functions: number[] };
+  /** TN3270E: the host bound an LU-LU session (BIND-IMAGE). */
+  bind: BindInfo;
+  /** TN3270E: the host ended the LU-LU session. */
+  unbind: { reason?: number };
   disconnect: { reason?: string };
   /** The screen or cursor changed; renderers should repaint dirty rows. */
   render: undefined;
@@ -77,6 +86,20 @@ export interface TerminalEvents {
   /** Every byte received from or sent to the host (for trace recording). */
   traffic: { dir: 'host' | 'terminal'; data: Uint8Array };
 }
+
+/** What a BIND image says about the session. Offsets as x3270 reads them. */
+export interface BindInfo {
+  /** The primary LU (the application), e.g. `TSO` or `A06TSO01`. */
+  plu?: string;
+  /** Screen sizes from the presentation-space bytes, when the BIND gives them. */
+  defaultSize?: { rows: number; cols: number };
+  alternateSize?: { rows: number; cols: number };
+  /** The BIND request unit as received. */
+  image: Uint8Array;
+}
+
+/** The TN3270E session sub-mode, as x3270 tracks it. */
+export type SessionMode = 'unbound' | 'lu-lu' | 'sscp-lu' | 'nvt';
 
 /** The default screen size for every model; the model size is the alternate. */
 const DEFAULT_GEOMETRY = { rows: 24, cols: 80 };
@@ -106,6 +129,12 @@ export class Terminal {
   /** TN3270E SEQ-NUMBER for the next 3270-DATA we send. */
   #seq = 0;
   #session: { deviceType: string; luName?: string; functions: number[] } | undefined;
+  #mode: SessionMode = 'unbound';
+  #bind: BindInfo | undefined;
+  /** SSCP-LU: where the host's text ended and the operator's input starts. */
+  #sscpStart = 0;
+  /** While set, outgoing data is held here (so a TN3270E response can go first). */
+  #held: Uint8Array[] | undefined;
 
   constructor(options: TerminalOptions = {}) {
     this.model = options.model ?? 2;
@@ -129,6 +158,20 @@ export class Terminal {
 
   get connected(): boolean {
     return this.#telnet?.in3270 ?? false;
+  }
+
+  /**
+   * TN3270E session state: `unbound` until the host sends a BIND (or SSCP-LU
+   * data), then `lu-lu` (an application) or `sscp-lu` (VTAM). Plain TN3270
+   * sessions are always `lu-lu` once connected.
+   */
+  get sessionMode(): SessionMode {
+    return this.#telnet?.tn3270e ? this.#mode : 'lu-lu';
+  }
+
+  /** The current BIND, in TN3270E. */
+  get bindInfo(): BindInfo | undefined {
+    return this.#telnet?.tn3270e ? this.#bind : undefined;
   }
 
   /** The TN3270E session (device type, LU and functions), when one was negotiated. */
@@ -172,6 +215,9 @@ export class Terminal {
     this.#lastAid = Aid.NONE;
     this.#seq = 0;
     this.#session = undefined;
+    this.#mode = 'unbound';
+    this.#bind = undefined;
+    this.#sscpStart = 0;
     const done = new Promise<void>((resolve, reject) => (this.#pending = { resolve, reject }));
     this.#unsubscribe = [
       transport.onData((d) => this.#receive(d)),
@@ -187,6 +233,9 @@ export class Terminal {
 
   /** Press a key. Anything the key sends goes to the host. */
   press(action: KeyAction): KeyResult {
+    if (action.type === 'aid' && this.sessionMode === 'sscp-lu' && !this.keyboard.isLocked) {
+      return this.#sscpAid(action.key);
+    }
     const result = this.keyboard.press(action);
     if (action.type === 'aid' && result.accepted) this.#lastAid = aidForKey(action.key);
     for (const out of result.outputs) {
@@ -238,6 +287,36 @@ export class Terminal {
     return this.type(text);
   }
 
+  /**
+   * An AID key in SSCP-LU mode (x3270 kybd.c): Enter sends the text typed
+   * since the host last wrote, as SSCP-LU-DATA, and moves to the next line;
+   * Clear clears the screen locally; other AIDs are refused (the status line's
+   * minus-function indicator arrives in task 3).
+   */
+  #sscpAid(key: AidKey): KeyResult {
+    const screen = this.screen;
+    if (key === 'CLEAR') {
+      screen.clear();
+      this.#sscpStart = 0;
+    } else if (key === 'ENTER') {
+      const input = readSscpLu(screen, this.#sscpStart);
+      const row = Math.floor(screen.cursor / screen.cols);
+      if (row === screen.rows - 1) {
+        writeSscpLu(screen, Uint8Array.of(0x15), screen.cursor); // NL scrolls
+        screen.cursor = (screen.rows - 1) * screen.cols;
+      } else {
+        screen.cursor = (row + 1) * screen.cols;
+      }
+      this.#sscpStart = screen.cursor;
+      this.#sendRecord(input, Tn3270eDataType.SSCP_LU_DATA);
+    } else {
+      this.#refresh(false);
+      return { accepted: false, outputs: [], rejected: 'operatorError' };
+    }
+    this.#refresh(false);
+    return { accepted: true, outputs: [] };
+  }
+
   #receive(chunk: Uint8Array): void {
     const telnet = this.#telnet;
     if (!telnet) return;
@@ -250,7 +329,7 @@ export class Terminal {
           break;
         case 'record':
           if (e.header) hostWrote = this.#tn3270eRecord(e.header, e.data) || hostWrote;
-          else hostWrote = this.#hostRecord(e.data) || hostWrote;
+          else hostWrote = this.#hostRecord(e.data).isWrite || hostWrote;
           break;
         case 'tn3270e': {
           const session = {
@@ -290,11 +369,50 @@ export class Terminal {
    * BIND, UNBIND, responses and SSCP-LU data are Phase 2 task 2.
    */
   #tn3270eRecord(header: Tn3270eHeader, data: Uint8Array): boolean {
+    const functions = this.#telnet?.functions ?? new Set<number>();
+    const binds = functions.has(Tn3270eFunction.BIND_IMAGE);
     switch (header.dataType) {
-      case Tn3270eDataType.DATA_3270:
-        return this.#hostRecord(data);
+      case Tn3270eDataType.DATA_3270: {
+        // With BIND-IMAGE agreed, 3270 data before a BIND is ignored (x3270).
+        if (binds && !this.#bind) return false;
+        this.#mode = 'lu-lu';
+        // s3270 sends its response before any reply the record produces.
+        const held: Uint8Array[] = (this.#held = []);
+        const r = this.#hostRecord(data);
+        this.#held = undefined;
+        this.#respond(header, r.sense);
+        for (const d of held) this.#send(d);
+        return r.isWrite;
+      }
       case Tn3270eDataType.BIND_IMAGE:
+        if (!binds) return false;
+        this.#bind = parseBind(data, this.codePage);
+        this.#events.emit('bind', this.#bind);
+        return false;
       case Tn3270eDataType.UNBIND:
+        if (!binds) return false;
+        this.#bind = undefined;
+        this.#mode = 'unbound';
+        this.screen.resize(DEFAULT_GEOMETRY.rows, DEFAULT_GEOMETRY.cols);
+        this.screen.clear();
+        this.#events.emit('unbind', data.length ? { reason: data[0]! } : {});
+        return false;
+      case Tn3270eDataType.SSCP_LU_DATA:
+        if (this.#mode !== 'sscp-lu') {
+          this.#mode = 'sscp-lu';
+          this.#sscpStart = this.screen.cursor;
+        }
+        this.screen.cursor = this.#sscpStart = writeSscpLu(this.screen, data, this.screen.cursor);
+        this.keyboard.hostWrite({ keyboardRestore: true });
+        this.#lastAid = Aid.NONE;
+        return true;
+      case Tn3270eDataType.NVT_DATA:
+        this.#mode = 'nvt';
+        this.#events.emit('nvt', data);
+        this.#respond(header, undefined);
+        return false;
+      case Tn3270eDataType.RESPONSE:
+      case Tn3270eDataType.REQUEST:
         return false;
       default:
         this.#events.emit('error', {
@@ -304,8 +422,40 @@ export class Terminal {
     }
   }
 
-  /** Apply one host record. Returns true if it was a write. */
-  #hostRecord(record: Uint8Array): boolean {
+  /**
+   * TN3270E responses (RFC 2355 §10.4.1), as s3270 4.5 sends them: a negative
+   * response for an error unless the host asked for none; otherwise a positive
+   * one for ALWAYS-RESPONSE, even when the record produced a reply (a read or
+   * a Query Reply). OS/390's ISPF waits for it after its Read Partition Query.
+   */
+  #respond(header: Tn3270eHeader, sense: OutboundSense | undefined): void {
+    const telnet = this.#telnet;
+    if (!telnet?.functions.has(Tn3270eFunction.RESPONSES)) return;
+    const wanted = header.responseFlag;
+    if (wanted === Tn3270eResponseFlag.NO_RESPONSE) return;
+    let flag: number;
+    let status: number;
+    if (sense) {
+      flag = Tn3270eResponseFlag.NEGATIVE;
+      status = sense === 'operationCheck' ? 0x02 : 0x00;
+    } else if (wanted === Tn3270eResponseFlag.ALWAYS_RESPONSE) {
+      flag = Tn3270eResponseFlag.POSITIVE;
+      status = 0x00; // device end
+    } else {
+      return;
+    }
+    this.#send(
+      telnet.frameRecord(Uint8Array.of(status), {
+        dataType: Tn3270eDataType.RESPONSE,
+        requestFlag: 0,
+        responseFlag: flag,
+        seq: header.seq,
+      }),
+    );
+  }
+
+  /** Apply one host record. */
+  #hostRecord(record: Uint8Array): { isWrite: boolean; sense?: OutboundSense } {
     const r = processOutbound(this.screen, record, this.#geometry);
     for (const message of [...r.errors, ...r.warnings]) this.#events.emit('error', { message });
 
@@ -316,20 +466,32 @@ export class Terminal {
           : readModified(this.screen, this.#lastAid, { all: r.read === 'modifiedAll' });
       this.#sendRecord(reply);
     }
-    if (r.structuredFields) this.#structuredFields(r.structuredFields);
-    const isWrite =
+    let sense = r.sense;
+    let isWrite =
       r.command === 'W' || r.command === 'EW' || r.command === 'EWA' || r.command === 'EAU';
-    if (isWrite) {
+    if (r.structuredFields) {
+      const sf = this.#structuredFields(r.structuredFields);
+      sense ??= sf.sense;
+      isWrite ||= sf.isWrite;
+    }
+    if (isWrite && r.command !== 'WSF') {
       this.keyboard.hostWrite({ keyboardRestore: r.keyboardRestore });
       if (r.keyboardRestore) this.#lastAid = Aid.NONE;
     }
     if (r.alarm) this.#events.emit('alarm', undefined);
-    return isWrite;
+    return sense ? { isWrite, sense } : { isWrite };
   }
 
   /** Write Structured Field. Phase 1 answers Read Partition Query / Query List. */
-  #structuredFields(payload: Uint8Array): void {
+  /**
+   * Write Structured Field: Read Partition Query / Query List, and Outbound
+   * 3270DS (a write carried in a structured field, which OS/390's ISPF uses).
+   * Anything else is a command reject, as in x3270.
+   */
+  #structuredFields(payload: Uint8Array): { isWrite: boolean; sense?: OutboundSense } {
     const { fields, errors } = parseStructuredFields(payload);
+    let isWrite = false;
+    let sense: OutboundSense | undefined = errors.length ? 'commandReject' : undefined;
     for (const message of errors) this.#events.emit('error', { message });
     for (const f of fields) {
       const type = f.data[1];
@@ -339,13 +501,24 @@ export class Terminal {
       ) {
         const { rows, cols } = this.#geometry.alternate;
         this.#sendRecord(buildQueryReply({ rows, cols, color: this.color }));
+      } else if (
+        f.id === StructuredFieldId.OUTBOUND_3270DS &&
+        f.data[0] === 0x00 &&
+        // W, EW, EWA, EAU (SNA command codes, as x3270 sf_outbound_ds).
+        (type === 0xf1 || type === 0xf5 || type === 0x7e || type === 0x6f)
+      ) {
+        const r = this.#hostRecord(f.data.subarray(1));
+        isWrite ||= r.isWrite;
+        sense ??= r.sense;
       } else {
+        sense ??= 'commandReject';
         const hex = (n: number | undefined) => (n ?? 0).toString(16).toUpperCase().padStart(2, '0');
         this.#events.emit('error', {
           message: `unsupported structured field X'${hex(f.id)}'${f.id === StructuredFieldId.READ_PARTITION ? ` type X'${hex(type)}'` : ''}; ignored`,
         });
       }
     }
+    return sense ? { isWrite, sense } : { isWrite };
   }
 
   #closed(reason?: string): void {
@@ -360,15 +533,15 @@ export class Terminal {
     this.#refresh(false);
   }
 
-  #sendRecord(data: Uint8Array): void {
+  #sendRecord(data: Uint8Array, dataType: number = Tn3270eDataType.DATA_3270): void {
     const telnet = this.#telnet;
     if (telnet?.tn3270e) {
       // RFC 2355 §10.4: count every 3270-DATA sent, wrapping at 32767.
       const seq = this.#seq;
-      this.#seq = (seq + 1) % 32768;
+      if (dataType === Tn3270eDataType.DATA_3270) this.#seq = (seq + 1) % 32768;
       this.#send(
         telnet.frameRecord(data, {
-          dataType: Tn3270eDataType.DATA_3270,
+          dataType,
           requestFlag: 0,
           responseFlag: 0,
           seq,
@@ -380,6 +553,10 @@ export class Terminal {
   }
 
   #send(data: Uint8Array | undefined): void {
+    if (data && this.#held) {
+      this.#held.push(data);
+      return;
+    }
     if (data && this.#transport) {
       this.#events.emit('traffic', { dir: 'terminal', data });
       this.#transport.send(data);
@@ -414,4 +591,33 @@ export class Terminal {
     this.#wasLocked = locked;
     if (hostWrote && !locked) this.#events.emit('screenSettled', undefined);
   }
+}
+
+/**
+ * Parse a BIND request unit (x3270 process_bind; offsets from 3270ds.h).
+ * Screen-size byte 0x7E: default and alternate are both rows×cols at 20/21;
+ * 0x7F: default at 20/21, alternate at 22/23; 0x00/0x02: 24×80; 0x03: the
+ * alternate is the model's size (left undefined here).
+ */
+export function parseBind(image: Uint8Array, codePage: CodePage): BindInfo {
+  const info: BindInfo = { image: Uint8Array.from(image) };
+  if (image[0] !== 0x31) return info;
+  const ss = image[24];
+  if (image.length > 24) {
+    if (ss === 0x00 || ss === 0x02) {
+      info.defaultSize = info.alternateSize = { rows: 24, cols: 80 };
+    } else if (ss === 0x03) {
+      info.defaultSize = { rows: 24, cols: 80 };
+    } else if (ss === 0x7e) {
+      info.defaultSize = info.alternateSize = { rows: image[20]!, cols: image[21]! };
+    } else if (ss === 0x7f) {
+      info.defaultSize = { rows: image[20]!, cols: image[21]! };
+      info.alternateSize = { rows: image[22]!, cols: image[23]! };
+    }
+  }
+  const len = image[27];
+  if (len !== undefined && len > 0 && len <= 8 && image.length >= 28 + len) {
+    info.plu = codePage.decode(image.subarray(28, 28 + len)).trimEnd();
+  }
+  return info;
 }
