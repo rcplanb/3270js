@@ -96,7 +96,8 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run check:traces",
     "test:live": "vitest run --config vitest.live.config.ts",
     "check:traces": "node scripts/check-traces.mjs",
-    "dev": "tsup && node scripts/dev.mjs"
+    "dev": "tsup && node scripts/dev.mjs",
+    "test:e2e": "playwright test"
   },
   "peerDependencies": {
     "ws": "^8.0.0"
