@@ -1,6 +1,6 @@
 # Phase 2 Implementation Plan
 
-> Status: **draft for review** · 2026-11-22 · Implements [SPEC.md](../SPEC.md) §2 Phase 2
+> Status: **in progress** · 2026-11-22 · Implements [SPEC.md](../SPEC.md) §2 Phase 2
 
 ## Approach
 
@@ -30,7 +30,7 @@ can run in parallel with it.
 
 ### TN3270E (→ Checkpoint E)
 
-- [ ] **0. TN3270E test host + s3270 interop harness**
+- [x] **0. TN3270E test host + s3270 interop harness**
   - Acceptance:
     - A Node server for the RFC 2355 server side, scriptable per test: device type
       accept or reject, CONNECT to a named LU, FUNCTIONS, BIND/UNBIND, responses,
@@ -38,6 +38,15 @@ can run in parallel with it.
     - A harness that runs the same script against 3270js and s3270, and compares the
       negotiation and the screens.
   - Verify: the harness runs s3270 through a full TN3270E negotiation and a BIND.
+  - Done: `test/helpers/tn3270e-host.ts`, `test/interop/` (10 tests). What s3270 showed:
+    - In TN3270E it asks for `IBM-3278-2-E` even as a 3279; RFC 2355 names only 3278
+      types, and colour goes in Query Reply. After falling back to plain TN3270 it
+      sends `IBM-3279-2-E`.
+    - It asks for CONTENTION-RESOLUTION (function 5) too, and accepts a counter-offer
+      without it.
+    - `Connect()` only returns once bound; 3270 data before BIND is ignored.
+    - Responses: positive `00`, negative `02` (operation check) for a bad address.
+    - Attn is `IAC IP`, SysReq is `IAC AO`; Enter on SSCP-LU goes back as SSCP-LU-DATA.
 
 - [ ] **1. TN3270E negotiation** (telnet layer)
   - Acceptance:
