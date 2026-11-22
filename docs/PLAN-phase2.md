@@ -204,12 +204,19 @@ can run in parallel with it.
 
 ### Presentation (→ Checkpoint G)
 
-- [ ] **9. More code pages**
+- [x] **9. More code pages**
   - Acceptance:
     - CP1047, 500, 285 and 1140 (with the euro) generated and cross-checked against the
       Unicode/IBM tables, as CP037 was.
     - A code-page picker in the demo.
   - Verify: unit tests (round trips, known positions).
+  - Done: cp500 and cp1140 from Python's codecs, cp1047 and cp285 from ICU's `.ucm`
+    tables (Python has no codec for them); cross-checked against unicode.org CP500,
+    ICU and x3270's tables, all identical. Each page carries its CGCSGID, now
+    reported in the Query Reply (697/n; 695/1140 for the euro). Interop: for each
+    page, every graphic byte shows as in `s3270 -codepage`, and the Character Sets
+    reply is byte-identical. Demo: a code-page picker (`?cp=`). ICU's license in
+    THIRD_PARTY_NOTICES.
 
 - [x] **10. APL glyphs**
   - Acceptance:
