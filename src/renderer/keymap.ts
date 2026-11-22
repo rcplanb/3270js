@@ -192,17 +192,10 @@ export class KeyboardMapper {
 
   #click(e: MouseEvent): void {
     if (this.#options.clickToMoveCursor === false || e.button !== 0) return;
-    const m = this.#renderer.cellMetrics;
-    const screenEl = this.#renderer.element.querySelector('.t3270-screen');
-    if (!m || !screenEl) return;
-    const rect = screenEl.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) / m.width);
-    const row = Math.floor((e.clientY - rect.top) / m.height);
-    const s = this.#term.screen;
-    if (row >= 0 && row < s.rows && col >= 0 && col < s.cols) {
-      e.preventDefault();
-      this.#term.moveCursor(row * s.cols + col);
-      this.textarea.focus();
-    }
+    const cell = this.#renderer.cellAt(e.clientX, e.clientY);
+    if (!cell) return;
+    e.preventDefault();
+    this.#term.moveCursor(cell.row * this.#term.screen.cols + cell.col);
+    this.textarea.focus();
   }
 }

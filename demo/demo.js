@@ -1,5 +1,6 @@
 import { Terminal, createTraceRecorder } from './dist/index.js';
 import { DomRenderer, KeyboardMapper } from './dist/dom.js';
+import { CanvasRenderer } from './dist/canvas.js';
 import { WebSocketTransport } from './dist/websocket.js';
 
 const $ = (id) => document.getElementById(id);
@@ -36,6 +37,24 @@ $('target').innerHTML = Object.entries(targets)
 
 let session; // { term, renderer, mapper, recorder }
 
+function makeRenderer(options) {
+  const Kind = $('renderer').value === 'canvas' ? CanvasRenderer : DomRenderer;
+  return new Kind($('terminal'), { ...options, fontSize: 17 });
+}
+
+function rebuildRenderer() {
+  if (!session) return;
+  const { term, renderer, mapper } = session;
+  mapper.dispose();
+  renderer.dispose();
+  const r = makeRenderer({ displayMode: $('display').value, oiaGlyphs: $('glyphs').checked });
+  r.attach(term);
+  session.renderer = r;
+  session.mapper = new KeyboardMapper(term, r);
+  session.mapper.focus();
+  window.__3270 = session;
+}
+
 function disconnect() {
   if (!session) return;
   session.term.disconnect();
@@ -53,7 +72,7 @@ async function connect() {
   const color = $('color').checked;
   const term = new Terminal({ model, color, keyboard: { blankFill: $('blankfill').checked } });
   $('terminal').replaceChildren();
-  const renderer = new DomRenderer($('terminal'), {
+  const renderer = makeRenderer({
     displayMode: color ? 'color' : $('display').value,
     oiaGlyphs: $('glyphs').checked,
   });
@@ -71,6 +90,7 @@ async function connect() {
   });
   recorder.attach(term);
   session = { term, renderer, mapper, recorder };
+  window.__3270 = session; // for automated tests and the console
   term.on('disconnect', (e) => {
     status(`Disconnected${e.reason ? `: ${e.reason}` : ''}.`);
     teardown();
@@ -99,21 +119,8 @@ async function connect() {
 
 $('connect').onclick = () => (session ? disconnect() : connect());
 $('display').onchange = () => session?.renderer.setDisplayMode($('display').value);
-$('glyphs').onchange = () => {
-  if (!session) return;
-  // Recreate the renderer with the new option, keeping the session.
-  const { term, renderer, mapper } = session;
-  mapper.dispose();
-  renderer.dispose();
-  const r = new DomRenderer($('terminal'), {
-    displayMode: $('display').value,
-    oiaGlyphs: $('glyphs').checked,
-  });
-  r.attach(term);
-  session.renderer = r;
-  session.mapper = new KeyboardMapper(term, r);
-  session.mapper.focus();
-};
+$('glyphs').onchange = rebuildRenderer;
+$('renderer').onchange = rebuildRenderer;
 $('trace').onclick = () => {
   if (!session) return;
   const blob = new Blob([JSON.stringify(session.recorder.trace(), null, 1)], {
@@ -130,5 +137,6 @@ $('trace').onclick = () => {
 // ?autoconnect connects on load; ?color=1 / ?model=N preset the options.
 const params = new URLSearchParams(location.search);
 if (params.has('model')) $('model').value = params.get('model');
+if (params.has('renderer')) $('renderer').value = params.get('renderer');
 if (params.get('color') === '1') $('color').checked = true;
 if (params.has('autoconnect')) void connect();

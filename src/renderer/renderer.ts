@@ -33,6 +33,8 @@ export interface Renderer {
   setDisplayMode(mode: DisplayMode): void;
   /** Show the shift indicator (Shift or Caps Lock is down). Called by the keyboard mapper. */
   setShift(down: boolean): void;
+  /** The screen cell under a point in client coordinates, if any (for mouse input). */
+  cellAt(clientX: number, clientY: number): { row: number; col: number } | undefined;
   /** Size of one character cell, once known. */
   readonly cellMetrics: CellMetrics | undefined;
   /** The element that should receive keyboard focus. */
