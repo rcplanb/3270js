@@ -10,7 +10,7 @@ for (const renderer of ['dom', 'canvas'] as const) {
     test('logs on to ISPF and opens the data set list by keyboard', async ({ page }) => {
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
-      await page.goto(`/?target=replay&renderer=${renderer}&color=1&autoconnect`);
+      await page.goto(`/?font=0&target=replay&renderer=${renderer}&color=1&autoconnect`);
 
       await logonToIspf(page, 'HERC01', 'NOTUSED');
       await expect(page.locator('#terminal')).toHaveScreenshot(`ispf-menu-${renderer}.png`);
@@ -29,9 +29,21 @@ for (const renderer of ['dom', 'canvas'] as const) {
     });
   });
 
+  test.describe(`${renderer} renderer, 3270 font`, () => {
+    test('loads the optional 3270 font and draws ISPF with it', async ({ page }) => {
+      await page.goto(`/?target=replay&renderer=${renderer}&color=1&autoconnect`);
+      await logonToIspf(page, 'HERC01', 'NOTUSED');
+      await page.evaluate(() => document.fonts.ready);
+      expect(await page.evaluate(() => document.fonts.check('17px "3270"'))).toBe(true);
+      await expect(page.locator('#terminal')).toHaveScreenshot(
+        `ispf-menu-3270font-${renderer}.png`,
+      );
+    });
+  });
+
   test.describe(`${renderer} renderer, outlining`, () => {
     test('draws field outlining and leaves transparent backgrounds unpainted', async ({ page }) => {
-      await page.goto(`/?target=outlining&renderer=${renderer}&color=1&autoconnect`);
+      await page.goto(`/?font=0&target=outlining&renderer=${renderer}&color=1&autoconnect`);
       await waitForScreen(page, /FIELD OUTLINING/, 'the outlining screen');
       await expect(page.locator('#terminal')).toHaveScreenshot(`outlining-${renderer}.png`);
     });
@@ -41,7 +53,9 @@ for (const renderer of ['dom', 'canvas'] as const) {
     test('shows ISPF at 27x132 after Erase/Write Alternate', async ({ page }) => {
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));
-      await page.goto(`/?target=replay-model5&model=5&renderer=${renderer}&color=1&autoconnect`);
+      await page.goto(
+        `/?font=0&target=replay-model5&model=5&renderer=${renderer}&color=1&autoconnect`,
+      );
       await logonToIspf(page, 'HERC03', 'NOTUSED');
       const rows = (await screenText(page)).split('\n');
       expect(rows).toHaveLength(27);
@@ -53,7 +67,7 @@ for (const renderer of ['dom', 'canvas'] as const) {
 }
 
 test('typed text appears on the screen in the browser', async ({ page }) => {
-  await page.goto('/?target=replay&autoconnect');
+  await page.goto('/?font=0&target=replay&autoconnect');
   await waitForScreen(page, /Logon ===>/, 'the logon screen');
   await page.keyboard.type('herc01');
   expect((await screenText(page)).split('\n')[22]).toContain('Logon ===> herc01');

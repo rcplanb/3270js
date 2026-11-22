@@ -1,0 +1,20 @@
+/*
+ * The "3270" font by Ricardo Bánffy (https://github.com/rbanffy/3270font,
+ * release v3.0.1), derived from x3270's fonts. BSD-3-Clause; see
+ * LICENSE-3270font.txt. The WOFF is the release's own; the WOFF2 was made
+ * from its TTF with Google's woff2_compress.
+ *
+ * Optional: link this stylesheet and the renderers' default theme, which
+ * lists "3270" first, uses it.
+ *   <link rel="stylesheet" href="node_modules/3270js/fonts/3270.css">
+ *   import '3270js/fonts/3270.css';   (with a bundler that handles CSS)
+ */
+@font-face {
+  font-family: '3270';
+  src:
+    url('./3270-Regular.woff2') format('woff2'),
+    url('./3270-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}

@@ -1,5 +1,5 @@
 import { Terminal, createTraceRecorder } from './dist/index.js';
-import { DomRenderer, KeyboardMapper } from './dist/dom.js';
+import { DEFAULT_THEME, DomRenderer, KeyboardMapper } from './dist/dom.js';
 import { CanvasRenderer } from './dist/canvas.js';
 import { WebSocketTransport } from './dist/websocket.js';
 
@@ -37,9 +37,16 @@ $('target').innerHTML = Object.entries(targets)
 
 let session; // { term, renderer, mapper, recorder }
 
+/** Without the 3270 font: the default theme's fallbacks only. */
+const PLAIN_THEME = {
+  ...DEFAULT_THEME,
+  fontFamily: 'Menlo, Consolas, "DejaVu Sans Mono", monospace',
+};
+
 function makeRenderer(options) {
   const Kind = $('renderer').value === 'canvas' ? CanvasRenderer : DomRenderer;
-  return new Kind($('terminal'), { ...options, fontSize: 17 });
+  const theme = $('font').checked ? DEFAULT_THEME : PLAIN_THEME;
+  return new Kind($('terminal'), { ...options, theme, fontSize: 17 });
 }
 
 function rebuildRenderer() {
@@ -140,6 +147,7 @@ async function connect() {
 $('connect').onclick = () => (session ? disconnect() : connect());
 $('display').onchange = () => session?.renderer.setDisplayMode($('display').value);
 $('glyphs').onchange = rebuildRenderer;
+$('font').onchange = rebuildRenderer;
 $('renderer').onchange = rebuildRenderer;
 $('trace').onclick = () => {
   if (!session) return;
@@ -154,7 +162,7 @@ $('trace').onclick = () => {
   URL.revokeObjectURL(a.href);
 };
 
-// ?autoconnect connects on load; ?color=1 / ?model=N / ?lu=NAME / ?cp=cp285 preset the options.
+// ?autoconnect connects on load; ?color=1 / ?model=N / ?lu=NAME / ?cp=cp285 / ?font=0 preset the options.
 const params = new URLSearchParams(location.search);
 if (params.has('model')) $('model').value = params.get('model');
 if (params.has('renderer')) $('renderer').value = params.get('renderer');
@@ -162,4 +170,5 @@ if (params.has('target')) $('target').value = params.get('target');
 if (params.get('color') === '1') $('color').checked = true;
 if (params.has('lu')) $('lu').value = params.get('lu');
 if (params.has('cp')) $('codepage').value = params.get('cp');
+if (params.get('font') === '0') $('font').checked = false;
 if (params.has('autoconnect')) void connect();

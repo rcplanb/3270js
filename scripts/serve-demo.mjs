@@ -16,7 +16,11 @@ const TYPES = {
   '.woff2': 'font/woff2',
 };
 // Only these directories are served.
-const MOUNTS = { '/dist/': join(root, 'dist'), '/': join(root, 'demo') };
+const MOUNTS = {
+  '/dist/': join(root, 'dist'),
+  '/fonts/': join(root, 'fonts'),
+  '/': join(root, 'demo'),
+};
 
 /**
  * @param {{ port: number, host?: string, targets: Record<string, {host: string, port: number}>, log?: boolean, debug?: boolean }} o

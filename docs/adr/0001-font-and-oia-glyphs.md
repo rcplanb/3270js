@@ -108,3 +108,12 @@ BDF for this ADR):
 3. Lay out the status line by the 3174 OIA column positions, matching the
    photo, so connection symbols sit at columns 0–2 and the input-inhibited
    area starts at column 8.
+
+## Update (2026-11-22, Phase 2 task 11)
+
+The font shipped as decided, in `fonts/` (exported as `3270js/fonts/*`):
+release v3.0.1's WOFF, plus a WOFF2 made from its TTF with Google's
+`woff2_compress` (64 KB against the WOFF's 109 KB), `3270.css` and the
+license. One consequence for the canvas renderer: a canvas doesn't make the
+browser load a web font, so it now requests its font through `document.fonts`
+and re-measures its cells when the font arrives.
