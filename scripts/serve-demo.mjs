@@ -19,6 +19,8 @@ const TYPES = {
 const MOUNTS = {
   '/dist/': join(root, 'dist'),
   '/fonts/': join(root, 'fonts'),
+  // Recorded sessions for the player page (committed fixtures: no passwords).
+  '/traces/': join(root, 'test', 'traces'),
   '/': join(root, 'demo'),
 };
 

@@ -9,6 +9,7 @@ export default defineConfig({
     node: 'src/node.ts',
     script: 'src/script.ts',
     cast: 'src/cast.ts',
+    player: 'src/player.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

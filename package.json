@@ -103,6 +103,16 @@
         "default": "./dist/cast.cjs"
       }
     },
+    "./player": {
+      "import": {
+        "types": "./dist/player.d.ts",
+        "default": "./dist/player.js"
+      },
+      "require": {
+        "types": "./dist/player.d.cts",
+        "default": "./dist/player.cjs"
+      }
+    },
     "./fonts/*": "./fonts/*",
     "./package.json": "./package.json"
   },
