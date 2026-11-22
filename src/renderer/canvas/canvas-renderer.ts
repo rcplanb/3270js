@@ -103,6 +103,16 @@ export class CanvasRenderer implements Renderer {
       terminal.on('screenSettled', () => this.#announce()),
     ];
     this.refresh();
+    // A canvas doesn't make the browser load a web font the way DOM text does:
+    // ask for it, then measure the cells again with the real font.
+    const fonts = this.#doc.fonts as FontFaceSet | undefined;
+    const font = `${this.#options.fontSize ?? 16}px ${this.#theme.fontFamily}`;
+    void fonts
+      ?.load(font)
+      .then((loaded) => {
+        if (loaded.length > 0 && this.#term === terminal) this.refresh();
+      })
+      .catch(() => undefined);
   }
 
   detach(): void {
@@ -364,6 +374,13 @@ export class CanvasRenderer implements Renderer {
   }
 
   #listen(): void {
+    // Any other web font finishing later: measure again and repaint.
+    const fonts = this.#doc.fonts as FontFaceSet | undefined;
+    if (fonts) {
+      const relayout = () => this.refresh();
+      fonts.addEventListener('loadingdone', relayout);
+      this.#listeners.push(() => fonts.removeEventListener('loadingdone', relayout));
+    }
     const on = <K extends keyof HTMLElementEventMap>(
       el: HTMLElement,
       type: K,

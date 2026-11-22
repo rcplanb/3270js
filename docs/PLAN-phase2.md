@@ -228,7 +228,7 @@ can run in parallel with it.
     the CP310 table from x3270's `apl2uc[]`; `displayChar()` serves `toText` and both
     renderers. The same ISPF screen replayed into s3270 matches cell for cell.
 
-- [ ] **11. Optional 3270 font** (ADR 0001)
+- [x] **11. Optional 3270 font** (ADR 0001)
   - Acceptance:
     - `3270js/fonts/3270-Regular.woff` (and WOFF2 if we can convert it), plus
       `3270js/fonts/3270.css` with `@font-face`.
@@ -236,6 +236,14 @@ can run in parallel with it.
     - A font toggle in the demo.
     - Not part of the main bundle.
   - Verify: e2e screenshots with the font.
+  - Done: `fonts/` (published, exported as `3270js/fonts/*`) holds the v3.0.1
+    release's WOFF (109 KB), a WOFF2 made with `woff2_compress` (64 KB), `3270.css`
+    (`@font-face` for "3270", WOFF2 first) and the font's license. The canvas
+    renderer now asks `document.fonts` for its font and re-measures when it
+    arrives: a canvas doesn't trigger web-font loading, so it had measured the
+    fallback font and drawn 3270 glyphs in too-wide cells. Demo: on by default,
+    `?font=0` or a checkbox to turn off; existing e2e baselines pinned to the system
+    font, new baselines with the font in three browsers × two renderers.
 
 - [ ] **13. Block (rectangular) selection and copy** _(requested 2026-11-22)_
   - Acceptance:

@@ -38,7 +38,7 @@ const KEYS: [string, string][] = [
 ];
 
 test('every mapped key reaches the terminal', async ({ page }, info) => {
-  await page.goto('/?target=replay&autoconnect');
+  await page.goto('/?font=0&target=replay&autoconnect');
   await waitForScreen(page, /Logon ===>/, 'the logon screen');
   await page.evaluate(() => {
     const w = window as unknown as { __pressed: string[] };

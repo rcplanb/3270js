@@ -26,6 +26,7 @@
   },
   "files": [
     "dist",
+    "fonts",
     "THIRD_PARTY_NOTICES.md"
   ],
   "main": "./dist/index.cjs",
@@ -82,6 +83,7 @@
         "default": "./dist/node.cjs"
       }
     },
+    "./fonts/*": "./fonts/*",
     "./package.json": "./package.json"
   },
   "scripts": {
