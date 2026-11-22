@@ -6,6 +6,7 @@ export const cp037 = createCodePage({
   id: 'cp037',
   name: 'IBM-037 (US/Canada)',
   aliases: ['037', 'ibm-037', 'ibm037'],
+  cgcsgid: [697, 37],
   // prettier-ignore
   table:
     '\u0000\u0001\u0002\u0003\u009c\u0009\u0086\u007f\u0097\u008d\u008e\u000b\u000c\u000d\u000e\u000f' + // 00-0F

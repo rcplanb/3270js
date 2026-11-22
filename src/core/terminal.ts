@@ -592,7 +592,13 @@ export class Terminal {
             ? [...f.data.subarray(3)]
             : undefined;
         this.#sendRecord(
-          buildQueryReply({ rows, cols, color: this.color, ...(only ? { only } : {}) }),
+          buildQueryReply({
+            rows,
+            cols,
+            color: this.color,
+            cgcsgid: this.codePage.cgcsgid,
+            ...(only ? { only } : {}),
+          }),
         );
       } else if (
         f.id === StructuredFieldId.READ_PARTITION &&

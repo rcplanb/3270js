@@ -6,6 +6,11 @@ export interface CodePage {
   readonly name: string;
   /** Other names this code page answers to (lower-case). */
   readonly aliases: readonly string[];
+  /**
+   * Coded graphic character set id: [GCSGID, CPGID], reported to the host in
+   * the Query Reply (Character Sets), e.g. [697, 37].
+   */
+  readonly cgcsgid: readonly [number, number];
   /** Map one EBCDIC byte (0–255) to a Unicode character. */
   toUnicode(byte: number): string;
   /** Map one Unicode character to its EBCDIC byte, or `undefined` if the code page lacks it. */
@@ -20,6 +25,8 @@ export interface CodePageDefinition {
   id: string;
   name: string;
   aliases?: readonly string[];
+  /** [GCSGID, CPGID]. Default [697, 37] (CP037). */
+  cgcsgid?: readonly [number, number];
   /** Exactly 256 distinct UTF-16 code units; index = EBCDIC byte value. */
   table: string;
 }
@@ -51,6 +58,7 @@ export function createCodePage(def: CodePageDefinition): CodePage {
     id: def.id.toLowerCase(),
     name: def.name,
     aliases: Object.freeze((def.aliases ?? []).map((a) => a.toLowerCase())),
+    cgcsgid: Object.freeze([def.cgcsgid?.[0] ?? 697, def.cgcsgid?.[1] ?? 37] as const),
     toUnicode,
     fromUnicode,
     decode(bytes: Uint8Array): string {

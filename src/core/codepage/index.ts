@@ -1,6 +1,10 @@
 export { createCodePage } from './codepage.js';
 export type { CodePage, CodePageDefinition } from './codepage.js';
 export { cp037 } from './cp037.js';
+export { cp1047 } from './cp1047.js';
+export { cp1140 } from './cp1140.js';
+export { cp285 } from './cp285.js';
+export { cp500 } from './cp500.js';
 export { CP310 } from './apl.js';
 export { displayChar } from './display.js';
 export { Ebcdic, isGraphic } from './ebcdic.js';

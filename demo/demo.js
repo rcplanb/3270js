@@ -78,6 +78,7 @@ async function connect() {
   const term = new Terminal({
     model,
     color,
+    codePage: $('codepage').value,
     ...(luName ? { luName } : {}),
     keyboard: { blankFill: $('blankfill').checked },
   });
@@ -153,11 +154,12 @@ $('trace').onclick = () => {
   URL.revokeObjectURL(a.href);
 };
 
-// ?autoconnect connects on load; ?color=1 / ?model=N / ?lu=NAME preset the options.
+// ?autoconnect connects on load; ?color=1 / ?model=N / ?lu=NAME / ?cp=cp285 preset the options.
 const params = new URLSearchParams(location.search);
 if (params.has('model')) $('model').value = params.get('model');
 if (params.has('renderer')) $('renderer').value = params.get('renderer');
 if (params.has('target')) $('target').value = params.get('target');
 if (params.get('color') === '1') $('color').checked = true;
 if (params.has('lu')) $('lu').value = params.get('lu');
+if (params.has('cp')) $('codepage').value = params.get('cp');
 if (params.has('autoconnect')) void connect();

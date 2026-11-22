@@ -133,3 +133,49 @@ describe('registry', () => {
     expect(() => createCodePage({ id: 'dup', name: 'Dup', table: dup })).toThrow(/duplicate/);
   });
 });
+
+describe('more code pages (Phase 2)', () => {
+  const pages = [
+    // id, byte, character, CGCSGID
+    ['cp1047', 0xad, '[', [697, 1047]],
+    ['cp1047', 0x5f, '^', [697, 1047]],
+    ['cp500', 0x4a, '[', [697, 500]],
+    ['cp500', 0x4f, '!', [697, 500]],
+    ['cp285', 0x5b, '£', [697, 285]],
+    ['cp285', 0x4a, '$', [697, 285]],
+    ['cp1140', 0x9f, '€', [695, 1140]],
+  ] as const;
+
+  it.each(pages)("%s: X'%s' is the right character", (id, byte, char, cgcsgid) => {
+    const cp = getCodePage(id)!;
+    expect(cp.toUnicode(byte)).toBe(char);
+    expect(cp.fromUnicode(char)).toBe(byte);
+    expect(cp.cgcsgid).toEqual(cgcsgid);
+  });
+
+  it('round-trips every byte, and answers to its aliases', () => {
+    for (const id of ['cp1047', 'cp500', 'cp285', 'cp1140']) {
+      const cp = getCodePage(id)!;
+      const all = Uint8Array.from({ length: 256 }, (_, b) => b);
+      expect([...cp.encode(cp.decode(all))]).toEqual([...all]);
+      expect(getCodePage(id.slice(2))).toBe(cp); // e.g. "1047"
+      expect(getCodePage(`IBM-${id.slice(2)}`)).toBe(cp);
+    }
+  });
+
+  it('differs from CP037 only where it should', () => {
+    const differing = (id: string) =>
+      Array.from({ length: 256 }, (_, b) => b).filter(
+        (b) => getCodePage(id)!.toUnicode(b) !== cp037.toUnicode(b),
+      );
+    expect(differing('cp1140')).toEqual([0x9f]); // the euro replaces ¤
+    expect(differing('cp1047')).toEqual([0x5f, 0xad, 0xb0, 0xba, 0xbb, 0xbd]);
+    expect(differing('cp285')).toEqual([0x4a, 0x5b, 0xa1, 0xb0, 0xb1, 0xba, 0xbc]);
+  });
+
+  it('lists all five', () => {
+    expect(listCodePages()).toEqual(
+      expect.arrayContaining(['cp037', 'cp1047', 'cp500', 'cp285', 'cp1140']),
+    );
+  });
+});

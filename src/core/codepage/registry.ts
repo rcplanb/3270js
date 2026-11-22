@@ -1,5 +1,9 @@
 import type { CodePage } from './codepage.js';
 import { cp037 } from './cp037.js';
+import { cp1047 } from './cp1047.js';
+import { cp1140 } from './cp1140.js';
+import { cp285 } from './cp285.js';
+import { cp500 } from './cp500.js';
 
 const byName = new Map<string, CodePage>();
 
@@ -22,4 +26,4 @@ export function listCodePages(): string[] {
   return [...new Set([...byName.values()].map((cp) => cp.id))];
 }
 
-registerCodePage(cp037);
+for (const cp of [cp037, cp1047, cp500, cp285, cp1140]) registerCodePage(cp);

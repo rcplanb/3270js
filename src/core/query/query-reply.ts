@@ -28,6 +28,8 @@ export interface QueryReplyOptions {
   cols: number;
   /** 3279 colour; otherwise a monochrome 3278. */
   color: boolean;
+  /** The base character set's [GCSGID, CPGID]. Default [697, 37] (CP037). */
+  cgcsgid?: readonly [number, number];
   /**
    * Query List (type List): only these replies, in the terminal's order; a
    * Null reply if none are supported (x3270 sf_read_part).
@@ -44,7 +46,7 @@ export function buildQueryReply(o: QueryReplyOptions): Uint8Array {
   const replies: [number, number[]][] = [
     [QueryCode.USABLE_AREA, usableArea(o)],
     [QueryCode.ALPHANUMERIC_PARTITIONS, alphanumericPartitions(o)],
-    [QueryCode.CHARACTER_SETS, characterSets()],
+    [QueryCode.CHARACTER_SETS, characterSets(o.cgcsgid ?? [697, 37])],
     [QueryCode.COLOR, color(o.color)],
     [QueryCode.HIGHLIGHTING, highlighting()],
     [QueryCode.REPLY_MODES, replyModes()],
@@ -87,7 +89,7 @@ function alphanumericPartitions(o: QueryReplyOptions): number[] {
   return [0x00, ...u16(o.rows * o.cols), 0x00]; // no partitions beyond the implicit one
 }
 
-function characterSets(): number[] {
+function characterSets([gcsgid, cpgid]: readonly [number, number]): number[] {
   return [
     0x82, // flags: GE supported, CGCSGIDs included
     0x00,
@@ -98,12 +100,12 @@ function characterSets(): number[] {
     0x00,
     0x00, // supported load PS formats: none
     0x07, // descriptor length
-    // Set 0: the base set, CGCSGID 697/37.
+    // Set 0: the base set, the session's code page (697/37 for CP037).
     0x00,
     0x10,
     0x00,
-    ...u16(697),
-    ...u16(37),
+    ...u16(gcsgid),
+    ...u16(cpgid),
     // Set 1: the APL (GE) set, LCID X'F1', CGCSGID 963/310.
     0x01,
     0x00,
