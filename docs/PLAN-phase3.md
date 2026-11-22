@@ -148,7 +148,7 @@ Each task is one PR.
     - Unit tests replay recorded TK5 sessions interactively (`test/helpers/replay-driver.ts`); the helpers send exactly the recorded records.
     - The live tests run on it, 9/9 on TK5, and a new live test checks the reconnect recovery on purpose.
 
-- [ ] **3. Docent actions**
+- [x] **3. Docent actions**
   - Acceptance:
     - A JSON action format, which `applyAction(terminal, action)` performs and reports on. Examples:
       - `{ fill: [{ field: 2, text: "HERC03" }], aid: "ENTER" }`
@@ -162,6 +162,13 @@ Each task is one PR.
     - The refusal reasons match SimH Assist's existing refusals.
     - Understanding ISPF is the hard part, and it happens in the Docent service. This task gives it what it needs to see: the recognised screen, each field's label, and whether it can be typed into (task 1).
   - Verify: unit tests, including every refusal.
+  - Done:
+    - `src/core/actions/`, exported from `3270js`:
+      - `parseAction(json)` checks untrusted JSON strictly: known properties only, and the types and length limits
+      - `applyAction(terminal, action)` checks every target first, then fills, types and presses, so an action is applied whole or not at all
+    - Refusals use SimH Assist's `injection_blocked` with a `reason`: `locked`, `password`, `protected`, `no-field`, `too-long`, `aid` or `not-connected`. A malformed action gets `invalid_action`.
+    - Allowed keys (`DOCENT_AIDS`): Enter, Clear, PA1–3 and PF1–24.
+    - Also fixed: `Session.command` at TSO READY pressed Home first, which on an unformatted screen typed at the top; it now types at the cursor.
 
 - [ ] **4. Recordings: asciinema export ("EBCDIC cinema")**
   - Acceptance:

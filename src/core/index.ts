@@ -14,3 +14,4 @@ export type { BindInfo, SessionMode, TerminalEvents, TerminalOptions } from './t
 export type { Transport } from './transport.js';
 export * from './observer/index.js';
 export * from './recognise/index.js';
+export * from './actions/index.js';
