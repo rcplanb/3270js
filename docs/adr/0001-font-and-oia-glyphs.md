@@ -44,7 +44,7 @@ BDF for this ADR):
 
 ## Decision
 
-1. **Text font.** Offer the 3270 font as an *optional* asset, not baked into
+1. **Text font.** Offer the 3270 font as an _optional_ asset, not baked into
    the bundle:
    - Ship it as `3270js/fonts/3270-Regular.woff` (WOFF2 later, once we can
      convert it), with its licence notice, plus a small CSS `@font-face`
