@@ -255,8 +255,8 @@ export function decodeAddress(b1: number, b2: number): number {
 ## 11. Open Questions
 
 1. ~~**Where the core runs inside SimH Assist.**~~ **Decided 2026-11-22:** the authoritative core runs in the browser, and SimH Assist runs a passive shadow core on the server. The shadow core parses both directions of the byte stream and relays to Hercules. This mirrors a real 3270 attached to a 3174 establishment controller. The server copy provides the screen model for the Docent, logging and redaction, and injected input is sent to the browser terminal. The library must therefore support a headless core that is fed both inbound and outbound records (an "observer" mode) as well as the normal interactive mode.
-2. **Hercules test environment.** Docker or native, which TK5 release, and where it runs (local or tailnet). Needed before the live tests and trace recording. TN3270E support in the Hercules version also needs checking.
-3. **Fonts for the canvas renderer.** Bundle an open 3270 font (for example the SIL OFL "3270" font), or use the system monospace font by default?
+2. ~~**Hercules test environment.**~~ **Decided 2026-11-22:** Docker on `gpu-server` (tailnet only), running MVS 3.8j TK5 Update 5 on SDL Hyperion 4.9.1. See `infra/hercules-tk5/`. **Finding:** Hercules' 3270 server negotiates plain TN3270 only, not TN3270E. Phase 2 TN3270E work needs a second target, such as a TN3270E-capable server or proxy. Still open: which one.
+3. **Fonts for the canvas renderer.** Bundle an open 3270 font (for example the SIL OFL "3270" font), or use the system monospace font by default? **Requirement:** the status line must show the real OIA symbols, including the Attn and SysReq indicators, the input-inhibited "X" with clock, and the "do not enter" symbol. A system monospace font won't have these, so whichever font we pick must include them (or we draw them ourselves).
 4. **Attn and SysReq mapping** on TN3270 (non-E) connections: `IAC IP` versus `IAC BREAK`. Check against Hercules and VM/370 behaviour.
 5. **npm name.** `3270js` (unscoped) is currently free. Confirm we publish unscoped and don't reserve a scope for future addons.
 
