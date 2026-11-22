@@ -19,6 +19,20 @@ export const ReadPartitionType = {
   READ_MODIFIED: 0xf6,
 } as const;
 
+/** Set Reply Mode modes. GA23-0059 §5.31. */
+export const ReplyModeCode = {
+  FIELD: 0x00,
+  EXTENDED_FIELD: 0x01,
+  CHARACTER: 0x02,
+} as const;
+
+/** Query List request types. GA23-0059 §5.11. */
+export const QueryListType = {
+  LIST: 0x00,
+  EQUIVALENT: 0x40,
+  ALL: 0x80,
+} as const;
+
 export interface StructuredField {
   id: number;
   data: Uint8Array;

@@ -40,6 +40,8 @@ export interface OutboundResult {
   keyboardRestore: boolean;
   /** The host asked for the alarm to sound. */
   alarm: boolean;
+  /** The WCC's reset bit: on an Erase/Write, the reply mode returns to field mode. */
+  wccReset?: boolean;
   /** EWA was processed (the screen is now at its alternate size). */
   alternate?: boolean;
   /** The host asked for an inbound read (RB, RM, RMA). */
@@ -377,6 +379,7 @@ function write(screen: Screen, rec: Uint8Array, result: OutboundResult, color: b
   if (insertCursor !== undefined) screen.cursor = insertCursor;
   result.keyboardRestore = wcc.keyboardRestore;
   result.alarm = wcc.soundAlarm;
+  if (wcc.reset) result.wccReset = true;
 }
 
 /** Read the count byte and (type, value) pairs of an SFE or MF order at `i`. */

@@ -72,10 +72,28 @@ describe('buildQueryReply (GA23-0059 §6)', () => {
     expect(mono2.get(QueryCode.IMPLICIT_PARTITION)).toBe(S3270_3278_2.implicitPartition);
   });
 
-  it('summarises exactly the replies it sends, and claims field reply mode only', () => {
-    expect(mono2.get(QueryCode.SUMMARY)).toBe('000c8180' + '808184858687' + '88a6');
-    expect(mono2.get(QueryCode.REPLY_MODES)).toBe('0005818800');
-    expect([...mono2.keys()]).toEqual([0x80, 0x81, 0x84, 0x85, 0x86, 0x87, 0x88, 0xa6]);
+  it('summarises exactly the replies it sends, with all three reply modes as s3270', () => {
+    expect(mono2.get(QueryCode.SUMMARY)).toBe('000d8180' + '808184858687' + '88a1a6');
+    expect(mono2.get(QueryCode.REPLY_MODES)).toBe('00078188000102'); // as s3270 4.5
+    expect([...mono2.keys()]).toEqual([0x80, 0x81, 0x84, 0x85, 0x86, 0x87, 0x88, 0xa1, 0xa6]);
+  });
+
+  it('names itself in RPQ Names (s3270 says x3270), and leaves out DDM', () => {
+    expect(mono2.get(QueryCode.RPQ_NAMES)).toBe(
+      '001381a1' + '00000000' + '00000000' + '07f3f2f7f091a2',
+    );
+    expect(mono2.has(0x95)).toBe(false); // DDM: no IND$FILE file transfer
+  });
+
+  it('answers a Query List with only the replies named, or Null', () => {
+    const only = (codes: number[]) => [
+      ...replies(buildQueryReply({ rows: 24, cols: 80, color: false, only: codes })).keys(),
+    ];
+    expect(only([0x86, 0x81])).toEqual([0x81, 0x86]); // the terminal's order
+    expect(only([0x99])).toEqual([0xff]); // nothing supported: Null
+    expect(
+      Buffer.from(buildQueryReply({ rows: 24, cols: 80, color: false, only: [] })).toString('hex'),
+    ).toBe('88' + '000481ff');
   });
 
   it('describes the alternate size for larger models', () => {

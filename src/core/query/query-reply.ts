@@ -1,7 +1,9 @@
 /**
  * Query Reply: the terminal's answer to Read Partition Query / Query List,
  * describing what it supports. GA23-0059 §6. Each reply was checked byte for
- * byte against s3270 4.5ga6's for the same model.
+ * byte against s3270 4.5ga6's for the same model, except RPQ Names (which
+ * names 3270js) and DDM, which 3270js leaves out: it is how a host learns the
+ * terminal can do IND$FILE file transfer, and 3270js can't.
  */
 import { Aid } from '../inbound/aid.js';
 
@@ -14,7 +16,10 @@ export const QueryCode = {
   COLOR: 0x86,
   HIGHLIGHTING: 0x87,
   REPLY_MODES: 0x88,
+  RPQ_NAMES: 0xa1,
   IMPLICIT_PARTITION: 0xa6,
+  /** Sent alone when a Query List names nothing the terminal supports. */
+  NULL: 0xff,
 } as const;
 
 export interface QueryReplyOptions {
@@ -23,6 +28,11 @@ export interface QueryReplyOptions {
   cols: number;
   /** 3279 colour; otherwise a monochrome 3278. */
   color: boolean;
+  /**
+   * Query List (type List): only these replies, in the terminal's order; a
+   * Null reply if none are supported (x3270 sf_read_part).
+   */
+  only?: readonly number[];
 }
 
 const QUERY_REPLY = 0x81;
@@ -38,11 +48,17 @@ export function buildQueryReply(o: QueryReplyOptions): Uint8Array {
     [QueryCode.COLOR, color(o.color)],
     [QueryCode.HIGHLIGHTING, highlighting()],
     [QueryCode.REPLY_MODES, replyModes()],
+    [QueryCode.RPQ_NAMES, rpqNames()],
     [QueryCode.IMPLICIT_PARTITION, implicitPartition(o)],
   ];
-  const summary = [QueryCode.SUMMARY, ...replies.map(([code]) => code)];
-  const out: number[] = [Aid.STRUCTURED_FIELD, ...reply(QueryCode.SUMMARY, summary)];
-  for (const [code, data] of replies) out.push(...reply(code, data));
+  const all: [number, number[]][] = [
+    [QueryCode.SUMMARY, [QueryCode.SUMMARY, ...replies.map(([code]) => code)]],
+    ...replies,
+  ];
+  const chosen = o.only ? all.filter(([code]) => o.only!.includes(code)) : all;
+  const out: number[] = [Aid.STRUCTURED_FIELD];
+  if (chosen.length === 0) out.push(...reply(QueryCode.NULL, []));
+  for (const [code, data] of chosen) out.push(...reply(code, data));
   return Uint8Array.from(out);
 }
 
@@ -110,7 +126,18 @@ function highlighting(): number[] {
 }
 
 function replyModes(): number[] {
-  return [0x00]; // field mode only; extended-field and character modes are not implemented
+  return [0x00, 0x01, 0x02]; // field, extended field and character modes
+}
+
+/** The terminal's name, as x3270 reports "x3270": 3270js in EBCDIC. */
+function rpqNames(): number[] {
+  const name = [0xf3, 0xf2, 0xf7, 0xf0, 0x91, 0xa2]; // "3270js"
+  return [
+    ...[0x00, 0x00, 0x00, 0x00], // device
+    ...[0x00, 0x00, 0x00, 0x00], // model
+    name.length + 1,
+    ...name,
+  ];
 }
 
 function implicitPartition(o: QueryReplyOptions): number[] {

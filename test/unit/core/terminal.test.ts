@@ -212,11 +212,19 @@ describe('Terminal', () => {
       host.write(frame('f5c3'));
       host.write(frame('f3000501ff02'));
       const sent = host.takeSent();
-      expect(sent.startsWith('88000c8180')).toBe(true); // AID X'88', Summary first
+      expect(sent.startsWith('88000d8180')).toBe(true); // AID X'88', Summary first
       expect(sent.endsWith('ffef')).toBe(true);
       expect(term.keyboard.isLocked).toBe(false);
-      host.write(frame('f3000501ff03')); // Query List
-      expect(host.takeSent().startsWith('88')).toBe(true);
+      host.write(frame('f3000701ff038081')); // Query List, type Equivalent: everything
+      expect(host.takeSent().startsWith('88000d8180')).toBe(true);
+      host.write(frame('f3000701ff030086')); // Query List, type List: Color only
+      expect(host.takeSent()).toMatch(/^88002681860010/);
+    });
+
+    it("rejects Read Partition Query for a partition other than X'FF'", async () => {
+      const { host } = await connected();
+      host.write(frame('f3000501ff02'.replace('01ff', '0100')));
+      expect(host.takeSent()).toBe('');
     });
 
     it('describes the model’s alternate size in the Query Reply', async () => {
