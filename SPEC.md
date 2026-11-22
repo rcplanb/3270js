@@ -1,6 +1,6 @@
 # Spec: 3270js
 
-> Status: **draft for review** · 2026-11-22
+> Status: **approved** · 2026-11-22 · Phase 1 and Phase 2 complete
 
 ## 1. Objective
 
@@ -48,7 +48,7 @@ So 3270js is a complete terminal emulator. Its core is a headless state machine,
 - **Renderers:** DOM and canvas, both implementing the same `Renderer` interface.
 - **Transports:** WebSocket (browser and Node) and raw TCP (Node only).
 
-### Phase 2: TN3270E and extended data stream
+### Phase 2: TN3270E and extended data stream — complete _(2026-11-22)_
 
 _Already delivered during Phase 1:_ Query Reply (Read Partition Query and Query List), the colour/monochrome setting (`color` and the renderers' live `displayMode`, with 3279 base colours), rendering of extended colour and highlighting, and EWA switching for models 3–5. What remains:
 

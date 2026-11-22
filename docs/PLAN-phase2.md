@@ -1,6 +1,6 @@
 # Phase 2 Implementation Plan
 
-> Status: **in progress** · 2026-11-22 · Implements [SPEC.md](../SPEC.md) §2 Phase 2
+> Status: **complete** · 2026-11-22 · Implements [SPEC.md](../SPEC.md) §2 Phase 2
 
 ## Approach
 
@@ -266,7 +266,7 @@ can run in parallel with it.
     in Chrome, Firefox and WebKit, both renderers; the drag leaves the cursor, a
     click moves it.
 
-- [ ] **12. Phase 2 acceptance and docs**
+- [x] **12. Phase 2 acceptance and docs**
   - Acceptance:
     - A TN3270E session (named LU, BIND, Attn, SysReq) passes against the test host and
       s3270, and live if Open Question 1 gives us a server.
@@ -274,6 +274,18 @@ can run in parallel with it.
     - A model 5 session works live.
     - README and SPEC are updated.
   - Verify: `npm run check`, `npm run test:e2e`, and the live runs.
+  - Done (2026-11-22):
+    - **TN3270E:** 3270js passes all 14 interop cases with s3270 through the
+      scripted host (named LU, BIND, responses, SSCP-LU, UNBIND, Attn, SysReq), and
+      was checked live on OS/390 2.10 (the museum's Multiprise 3000): logon, ISPF,
+      SysReq to VTAM and back, Attn stopping a listing; 86 of 86 requested responses.
+    - **Colour:** the differential matches s3270 on every screen of four colour
+      traces (models 2 to 5), colour and highlighting included.
+    - **Live on TK5 (HERC03):** `npm run test:live` (logon, ISPF tour), the ISPF tour
+      as a colour model 5, and `npm run test:e2e:live` (edit, save and verify a
+      member in Revedit, DOM and canvas): all pass.
+    - **Docs:** README (Phase 2 features, tests, lessons, roadmap), SPEC and this
+      plan updated.
 
 ## Checkpoints
 
@@ -292,13 +304,10 @@ can run in parallel with it.
 | TK5's VTAM may not offer every model's logmode             | Find out in task 8; record whatever it supports                                                              |
 | The font has no WOFF2 build                                | Ship WOFF (108 KB, optional) and add WOFF2 when a converter is available                                     |
 
-## Open questions
+## Open questions (answered)
 
-1. **A real TN3270E server for live acceptance.** Hercules can't do it. Could the
-   museum's **Multiprise 3000** (OS/390's TN3270E server) be reached from this Mac,
-   for example over the tailnet? Is there another option you'd prefer? Otherwise the
-   test host plus s3270 is the Phase 2 bar.
-2. **Code pages:** are 1047, 500, 285 and 1140 the right four, or does the museum need
-   others (273 German, 297 French, …)?
-3. **WOFF2 for the font:** OK to install Google's `woff2` tool (`brew install woff2`) to
-   convert the published WOFF/TTF? It saves about a third of the size.
+1. **A real TN3270E server:** the museum's Multiprise 3000 running OS/390 2.10,
+   over the museum tailnet. Used for the live TN3270E checks; the user ran the
+   logons. (A P390 running VM is also available.)
+2. **Code pages:** 1047, 500, 285 and 1140, as proposed.
+3. **WOFF2:** `woff2` installed with Homebrew; the font ships as WOFF2 and WOFF.
