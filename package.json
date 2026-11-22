@@ -83,6 +83,16 @@
         "default": "./dist/node.cjs"
       }
     },
+    "./script": {
+      "import": {
+        "types": "./dist/script.d.ts",
+        "default": "./dist/script.js"
+      },
+      "require": {
+        "types": "./dist/script.d.cts",
+        "default": "./dist/script.cjs"
+      }
+    },
     "./fonts/*": "./fonts/*",
     "./package.json": "./package.json"
   },
