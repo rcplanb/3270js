@@ -213,6 +213,11 @@ Each task is one PR.
     - `npm pack` builds `3270js-0.1.0.tgz`, attached to a GitHub release `v0.1.0` (the repository stays private, and `package.json` keeps `private: true`, so nothing can reach npm by accident).
     - A `CHANGELOG.md` entry, and the README states how to install from the tarball.
   - Verify: the tarball installs into an empty Node 20 CommonJS project, and `require('3270js/node')` and the ES module entry points load.
+  - Prepared:
+    - version `0.1.0`, `CHANGELOG.md`, and README install instructions
+    - `npm run check:pack`, which packs the tarball, installs it into an empty CommonJS project and loads all 8 entry points with `require` and `import`, plus the fonts and a smoke test; it passes on Node 20.20.2 and 24.22.1
+    - Found on the way: `3270js/node` needs `ws` even for `TcpTransport` (#56, documented)
+  - The tag and GitHub release follow once this is merged to `main`.
 
 ### simh-assist: the integration (→ Checkpoints I and J)
 

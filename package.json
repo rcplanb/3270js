@@ -1,6 +1,6 @@
 {
   "name": "3270js",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "TN3270/TN3270E terminal emulator library for the browser and Node: an xterm.js analogue for IBM 3270",
   "license": "MIT",
@@ -130,7 +130,8 @@
     "check:traces": "node scripts/check-traces.mjs",
     "dev": "tsup && node scripts/dev.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:live": "playwright test --config playwright.live.config.ts"
+    "test:e2e:live": "playwright test --config playwright.live.config.ts",
+    "check:pack": "npm run build && node scripts/check-pack.mjs"
   },
   "peerDependencies": {
     "ws": "^8.0.0"
