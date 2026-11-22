@@ -20,8 +20,14 @@ const CONTINUE = /^\s*\*\*\*(\s|$)/m;
 const READY = /^\s*READY\s*$/m;
 
 export class TsoSession {
-  /** LIVE_COLOR=1 records as a 3279 (colour), so the host sends its colours. */
-  readonly term = new Terminal({ color: process.env.LIVE_COLOR === '1' });
+  /**
+   * LIVE_COLOR=1 runs as a 3279 (colour), so the host sends its colours;
+   * LIVE_MODEL=3|4|5 picks the screen size (default 2).
+   */
+  readonly term = new Terminal({
+    color: process.env.LIVE_COLOR === '1',
+    model: Number(process.env.LIVE_MODEL ?? 2) as 2 | 3 | 4 | 5,
+  });
   readonly recorder: TraceRecorder | undefined;
   loggedOn = false;
 

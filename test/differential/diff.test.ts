@@ -34,11 +34,12 @@ async function pair(trace: Trace) {
   await host.listen();
   // A 3279 trace is compared as a 3279: a 3278 ignores host colours.
   const color = /3279/.test(trace.meta.terminalType);
-  const s3 = new S3270([], color ? '3279-2' : '3278-2');
+  const model = trace.meta.model;
+  const s3 = new S3270([], `${color ? 3279 : 3278}-${model}`);
   // s3270 completes Connect() only after the host's first write, so don't wait here.
   const s3connected = s3.run(`Connect(127.0.0.1:${host.port})`);
 
-  const term = new Terminal({ color });
+  const term = new Terminal({ color, model });
   const fake = new FakeHost();
   const ready = term.connect(fake);
   fake.write(steps.prelude);
@@ -89,17 +90,18 @@ async function compare(
     const theirs = parseReadBuffer(await s3.run('ReadBuffer(Ebcdic)'));
     const [row, col] = (await s3.run('Query(Cursor)'))[0]!.trim().split(/\s+/).map(Number);
     const mine = ourCells(term);
+    const cols = term.screen.cols;
     problems = [];
     if (theirs.length !== mine.length)
       problems.push(`buffer size ${mine.length} vs s3270 ${theirs.length}`);
     for (let a = 0; a < mine.length && problems.length < 8; a++) {
       if (JSON.stringify(mine[a]) !== JSON.stringify(theirs[a])) {
         problems.push(
-          `(${Math.floor(a / 80)},${a % 80}) ours ${JSON.stringify(mine[a])} s3270 ${JSON.stringify(theirs[a])}`,
+          `(${Math.floor(a / cols)},${a % cols}) ours ${JSON.stringify(mine[a])} s3270 ${JSON.stringify(theirs[a])}`,
         );
       }
     }
-    const cursor = row! * 80 + col!;
+    const cursor = row! * cols + col!;
     if (term.screen.cursor !== cursor)
       problems.push(`cursor ours ${term.screen.cursor} s3270 ${cursor}`);
     if (problems.length === 0) return undefined;
@@ -108,7 +110,14 @@ async function compare(
   return { where, problems };
 }
 
-const traces = ['tso-logon', 'ispf-tour', 'ispf-tour-3279'];
+const traces = [
+  'tso-logon',
+  'ispf-tour',
+  'ispf-tour-3279',
+  'ispf-tour-3279-3',
+  'ispf-tour-3279-4',
+  'ispf-tour-3279-5',
+];
 
 describe.skipIf(!available)('differential: host writes (3270js vs s3270)', () => {
   const cleanups: (() => Promise<void>)[] = [];
@@ -203,6 +212,8 @@ describe.skipIf(!available)('differential: keyboard (3270js vs s3270)', () => {
     ['ispf-tour', 'Data set name prefix'],
     ['ispf-tour', 'Row 1 of 62'],
     ['ispf-tour-3279', 'ISPF primary option menu'],
+    ['ispf-tour-3279-5', 'ISPF primary option menu'],
+    ['ispf-tour-3279-5', 'Data set name prefix'],
   ];
 
   for (const [name, marker] of cases) {
@@ -221,7 +232,8 @@ describe.skipIf(!available)('differential: keyboard (3270js vs s3270)', () => {
 
       const diffs: Diff[] = [];
       for (const [action, s3action] of SCRIPT) {
-        if (action.type === 'moveCursor') p.term.screen.cursor = action.row * 80 + action.col;
+        if (action.type === 'moveCursor')
+          p.term.screen.cursor = action.row * p.term.screen.cols + action.col;
         else if (action.type === 'string') p.term.type(action.text);
         else p.term.press(action);
         // s3270 reports an operator error (e.g. typing into a protected field)

@@ -12,6 +12,7 @@ HERCULES_HOST=100.113.55.17 TSO_USER=HERC03 TSO_PASSWORD=... npm run test:e2e:li
 | `HERCULES_HOST` | (required) | TN3270 host                                                                                               |
 | `HERCULES_PORT` | `3270`     |                                                                                                           |
 | `TSO_USER`      | `HERC03`   | Automated tests use HERC03, so they never collide with interactive sessions on HERC01/HERC02.             |
+| `LIVE_MODEL`    | `2`        | `3`, `4` or `5`: the screen model (32×80, 43×80, 27×132).                                                 |
 | `LIVE_COLOR`    | (off)      | `1` runs as a 3279 (colour), so the host sends colours. With `RECORD_TRACE=path`, records a colour trace. |
 | `TSO_PASSWORD`  | (required) | Never commit it. It is typed into a non-display field, so it never appears in the printed screens.        |
 
