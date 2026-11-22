@@ -1,0 +1,22 @@
+# One-time:  ./fetch-tk5.sh            (unpacks TK5 into ./tk5)
+# Run:       BIND_IP=<tailnet ip> docker compose up -d --build
+#
+# BIND_IP keeps both ports off public interfaces. It defaults to loopback so a
+# missing value can never expose the Hercules HTTP console, which has no auth.
+services:
+  tk5:
+    build: .
+    image: tk5-hercules-runtime:local
+    container_name: tk5
+    restart: unless-stopped
+    init: true
+    user: "${TK5_UID:-1000}:${TK5_GID:-1000}"
+    stop_grace_period: 60s
+    environment:
+      NUMCPU: "2"
+      MAINSIZE: "16"
+    ports:
+      - "${BIND_IP:-127.0.0.1}:3270:3270"
+      - "${BIND_IP:-127.0.0.1}:8038:8038"
+    volumes:
+      - "${TK5_DIR:-./tk5}:/tk5"
