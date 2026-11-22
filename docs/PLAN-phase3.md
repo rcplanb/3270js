@@ -1,6 +1,6 @@
 # Phase 3 Implementation Plan
 
-> Status: **draft for review** · 2026-11-22 · Implements [SPEC.md](../SPEC.md) §2 Phase 3
+> Status: **decisions recorded, for review** · 2026-11-22 · Implements [SPEC.md](../SPEC.md) §2 Phase 3
 
 ## Goal
 
@@ -78,8 +78,9 @@ browser                        SimH Assist server                  host
 
 Two repositories:
 
-- **Tasks 0–5** are library work in **3270js**.
-- **Tasks 6–11** are integration work in **simh-assist**, as PRs into its `develop` branch.
+- **Tasks 0–6** are library work in **3270js**, ending in a release.
+- **Tasks 7–12** are integration work in **simh-assist**, as PRs into its `develop` branch, which you merge, as here.
+- **Task 13**, OS/390 under Hercules, is infrastructure, done in parallel.
 
 Each task is one PR.
 
@@ -131,11 +132,14 @@ Each task is one PR.
     - A JSON action format, which `applyAction(terminal, action)` performs and reports on. Examples:
       - `{ fill: [{ field: 2, text: "HERC03" }], aid: "ENTER" }`
       - `{ command: "LISTCAT" }`, which types at the cursor or on the command line, then presses Enter
+      - `{ aid: "PF3" }`
+    - **The Docent may do what the visitor can**, after the visitor clicks "Run": fill fields, move the cursor, and press Enter, Clear, PA1–3 or PF1–24. Not Attn or SysReq, which change the session's state.
     - **Refused:**
       - into non-display (password) fields
       - into protected fields
       - while the keyboard is locked
     - The refusal reasons match SimH Assist's existing refusals.
+    - Understanding ISPF is the hard part, and it happens in the Docent service. This task gives it what it needs to see: the recognised screen, each field's label, and whether it can be typed into (task 1).
   - Verify: unit tests, including every refusal.
 
 - [ ] **4. Recordings: asciinema export ("EBCDIC cinema")**
@@ -157,9 +161,17 @@ Each task is one PR.
     - This is the true 3270 view of a recording, for the admin and dashboard pages, next to the asciinema version.
   - Verify: e2e in three browsers × two renderers on a recorded trace.
 
+- [ ] **6. Release v0.1.0 for SimH Assist**
+  - Acceptance:
+    - `npm pack` builds `3270js-0.1.0.tgz`, attached to a GitHub release `v0.1.0` (the repository stays private, and `package.json` keeps `private: true`, so nothing can reach npm by accident).
+    - A `CHANGELOG.md` entry, and the README states how to install from the tarball.
+  - Verify: the tarball installs into an empty Node 20 CommonJS project, and `require('3270js/node')` and the ES module entry points load.
+
 ### simh-assist: the integration (→ Checkpoints I and J)
 
-- [ ] **6. A `tn3270-target` machine kind**
+SimH Assist **vendors the tarball** (`vendor/3270js-0.1.0.tgz`, `"3270js": "file:vendor/3270js-0.1.0.tgz"`), so its rsync deploys need no access to the private repository. Moving to npm later, once 3270js is public, is a one-line change.
+
+- [ ] **7. A `tn3270-target` machine kind**
   - Acceptance:
     - A migration that rebuilds `machines` with `tn3270-target` added to its CHECK constraint.
     - Columns or JSON for model, colour, code page, LU name and TN3270E.
@@ -167,7 +179,7 @@ Each task is one PR.
     - `connection: 'tn3270'`.
   - Verify: `node --test` for the migration and registry; the admin API round-trips.
 
-- [ ] **7. Relay and observer on the server**
+- [ ] **8. Relay and observer on the server**
   - Acceptance:
     - A WebSocket handler for `tn3270` machines: binary frames relayed to the machine's host and port, using the machine record only (never an open relay).
     - A `SessionObserver` attached to every session.
@@ -175,7 +187,7 @@ Each task is one PR.
     - A JSON control channel for Docent actions and state.
   - Verify: an integration test with 3270js's scripted test host; live on TK5.
 
-- [ ] **8. The browser page**
+- [ ] **9. The browser page**
   - Acceptance:
     - `index.html` chooses the renderer by the machine's terminal type: xterm for the existing machines, and 3270js (DOM renderer, keyboard mapper, 3270 font, status line) for `tn3270`.
     - 3270js served from `node_modules` like xterm.
@@ -183,7 +195,7 @@ Each task is one PR.
     - `window.simhAssist` works for 3270 too: `getTerminalOutput` returns the screen text.
   - Verify: SimH Assist's CI checks, and a manual visit through the dashboard.
 
-- [ ] **9. Docent bridge for 3270**
+- [ ] **10. Docent bridge for 3270**
   - Acceptance:
     - `/terminal/state` returns:
       - the screen text
@@ -195,7 +207,7 @@ Each task is one PR.
     - It's refused when not ready, or when the target field is hidden.
   - Verify: `node --test` with a stubbed observer; live with the Docent service.
 
-- [ ] **10. Logging and replay**
+- [ ] **11. Logging and replay**
   - Acceptance:
     - A 3270 session writes its redacted 3270js trace, plus a derived `.cast` for asciinema-player and MP4 export.
     - Its command/response pairs go to `session_commands`.
@@ -205,7 +217,7 @@ Each task is one PR.
     - A recorded TK5 session replays in both players and exports to MP4.
     - **The password appears in none of the outputs.**
 
-- [ ] **11. Phase 3 acceptance**
+- [ ] **12. Phase 3 acceptance**
   - Acceptance, live on TK5 through SimH Assist:
     1. A visitor logs on.
     2. The Docent recognises the ISPF menu, proposes a command and injects it after "Run".
@@ -214,13 +226,23 @@ Each task is one PR.
   - Also: README and docs in both repos.
   - Verify: the live run, then a museum demo checklist.
 
+### Infrastructure (in parallel)
+
+- [ ] **13. OS/390 (ADCD) under Hercules**
+  - Acceptance:
+    - A container on gpu-server running OS/390 from the museum's ADCD, alongside TK5, with its own `infra/hercules-os390/` (Dockerfile, compose and README).
+    - **The ADCD volumes are licensed:** they're never committed, and they live in a bind mount under `/home` (the root filesystem is small). The user provides them and confirms that the licence covers this use.
+    - TN3270 through Hercules' 3270 port, plus OS/390's own TCP/IP and **TN3270E server** through a container network interface (LCS or CTC), so TN3270E can be tested on our own hardware, not only on the Multiprise.
+    - A SimH Assist machine for it.
+  - Verify: logon and ISPF through 3270js over both ports; the TN3270E interop findings from the Multiprise reproduced.
+
 ## Checkpoints
 
-|       | Gate                                                                        | Proves                                 |
-| ----- | --------------------------------------------------------------------------- | -------------------------------------- |
-| **H** | Tasks 0–5: observer matches `Terminal` on every trace; cast and player work | The library has what SimH Assist needs |
-| **I** | Tasks 6–8: a visitor uses TK5 through SimH Assist                           | The plumbing works                     |
-| **J** | Tasks 9–11: Docent help, logging and replay, no password anywhere           | Phase 3 done                           |
+|       | Gate                                                                                         | Proves                                 |
+| ----- | -------------------------------------------------------------------------------------------- | -------------------------------------- |
+| **H** | Tasks 0–6: observer matches `Terminal` on every trace; cast and player work; v0.1.0 released | The library has what SimH Assist needs |
+| **I** | Tasks 7–9: a visitor uses TK5 through SimH Assist                                            | The plumbing works                     |
+| **J** | Tasks 10–12: Docent help, logging and replay, no password anywhere                           | Phase 3 done                           |
 
 ## Risks
 
@@ -230,12 +252,16 @@ Each task is one PR.
 | The observer drifting from the browser's terminal                            | Task 0's equivalence test on every trace; both are built from the same core                                                                                        |
 | A `kind` migration on a live SQLite database                                 | Copy-table migration in a transaction, tested on a copy of production's schema; back up first                                                                      |
 | Docent actions surprising the visitor                                        | Actions run in the browser, through the same keyboard rules, after "Run"; never into hidden fields                                                                 |
-| How SimH Assist gets 3270js (not on npm yet)                                 | Open question 1                                                                                                                                                    |
+| Teaching the Docent to drive ISPF                                            | Out of this plan's code, but the state API gives it recognised screens and labelled fields; start with a few scripted tasks (browse a data set, run a command)     |
+| ADCD licensing and disk space                                                | Images never committed; bind mount under `/home`; the user confirms the licence                                                                                    |
 
-## Open questions
+## Decisions (2026-11-22)
 
-1. **Delivery of 3270js to SimH Assist.** Publish it to npm now (public, MIT, as `3270js`), or install it in SimH Assist from a GitHub release tarball or git tag until it's public? SPEC says to ask before publishing.
-2. **Docent authority.** May the Docent fill fields and press AID keys (Enter, PF3 and so on) after the visitor clicks "Run", or only type commands at a ready prompt as today? In both cases it never touches hidden fields.
-3. **Which host first.** TK5 on gpu-server for development. For the museum, is TK5 the first public mainframe, with the MP3000 later? And can SimH Assist's production server reach gpu-server's tailnet address?
-4. **SimH Assist workflow.** PRs into `develop`, which you merge, as here? Any conventions there I should follow beyond its CLAUDE.md?
-5. **Recordings.** Keep both the 3270js trace (the original) and the derived `.cast` per session? That doubles the storage, but keeps the existing players and MP4 export working.
+1. **Delivery:** a GitHub release tarball, vendored into SimH Assist; publish to npm later, when 3270js goes public.
+2. **Docent authority:** after "Run", the Docent may fill fields and press AID keys (Enter, PF3 and the rest) as the visitor could; never into hidden fields; not Attn or SysReq.
+3. **Hosts:**
+   - **Development:** TK5. SimH Assist's production server can reach gpu-server on the tailnet.
+   - **Also:** OS/390 from the ADCD under Hercules (task 13).
+   - **The Multiprise 3000:** later, for permitted users only, once the SimH Assist server is on the museum's tailnet.
+4. **Workflow:** as here. One PR per task into SimH Assist's `develop`, which the user merges.
+5. **Recordings:** keep both the 3270js trace (the original) and the derived `.cast` for every session.
