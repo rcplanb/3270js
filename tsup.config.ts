@@ -8,6 +8,7 @@ export default defineConfig({
     websocket: 'src/websocket.ts',
     node: 'src/node.ts',
     script: 'src/script.ts',
+    cast: 'src/cast.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,
