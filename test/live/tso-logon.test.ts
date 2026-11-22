@@ -2,8 +2,11 @@
  * Checkpoint B: log on to TSO on a real TK5 system using only 3270js, reach
  * ISPF, exit to READY, log off. Prints every screen as text.
  */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { Terminal } from '../../src/core/terminal.js';
+import { createTraceRecorder } from '../../src/core/trace/index.js';
 import { TcpTransport } from '../../src/node.js';
 
 const host = process.env.HERCULES_HOST;
@@ -13,6 +16,21 @@ const password = process.env.TSO_PASSWORD;
 
 const term = new Terminal();
 let loggedOn = false;
+
+/** Set RECORD_TRACE=path to save a (redacted) trace of the session. */
+const tracePath = process.env.RECORD_TRACE;
+const recorder = tracePath
+  ? createTraceRecorder({
+      meta: {
+        terminalType: term.terminalType,
+        model: term.model,
+        codePage: term.codePage.id,
+        description: 'TSO logon to ISPF, =X to READY, LOGOFF (test/live/tso-logon.test.ts)',
+        recorded: new Date().toISOString(),
+      },
+    })
+  : undefined;
+recorder?.attach(term);
 
 /** Resolve once `cond` holds and the host has been quiet for `quietMs`. */
 function waitFor(
@@ -78,6 +96,11 @@ describe.skipIf(!host || !password)(`TSO logon on ${host ?? '(no host)'}`, () =>
       }
     }
     term.disconnect();
+    if (recorder && tracePath) {
+      mkdirSync(dirname(tracePath), { recursive: true });
+      writeFileSync(tracePath, JSON.stringify(recorder.trace(), null, 1) + '\n');
+      console.log(`trace written to ${tracePath}`);
+    }
   });
 
   it('connects and shows the VTAM logon screen', async () => {
