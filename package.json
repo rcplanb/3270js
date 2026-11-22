@@ -92,8 +92,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check:exports": "npm run build && node scripts/check-exports.mjs",
-    "check": "npm run typecheck && npm run lint && npm test",
-    "test:live": "vitest run --config vitest.live.config.ts"
+    "check": "npm run typecheck && npm run lint && npm test && npm run check:traces",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "check:traces": "node scripts/check-traces.mjs"
   },
   "peerDependencies": {
     "ws": "^8.0.0"

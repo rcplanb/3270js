@@ -60,6 +60,8 @@ export interface TerminalEvents {
   error: { message: string };
   /** Data received outside 3270 mode. */
   nvt: Uint8Array;
+  /** Every byte received from or sent to the host (for trace recording). */
+  traffic: { dir: 'host' | 'terminal'; data: Uint8Array };
 }
 
 /** The default screen size for every model; the model size is the alternate. */
@@ -192,6 +194,7 @@ export class Terminal {
   #receive(chunk: Uint8Array): void {
     const telnet = this.#telnet;
     if (!telnet) return;
+    this.#events.emit('traffic', { dir: 'host', data: chunk });
     let hostWrote = false;
     for (const e of telnet.receive(chunk)) {
       switch (e.type) {
@@ -285,7 +288,10 @@ export class Terminal {
   }
 
   #send(data: Uint8Array | undefined): void {
-    if (data && this.#transport) this.#transport.send(data);
+    if (data && this.#transport) {
+      this.#events.emit('traffic', { dir: 'terminal', data });
+      this.#transport.send(data);
+    }
   }
 
   /** Update the OIA and fire render/unlock/settled events as needed. */
