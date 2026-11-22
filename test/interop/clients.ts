@@ -30,7 +30,7 @@ const s3270: ClientFactory = {
   name: 's3270',
   available: s3270Available(),
   create() {
-    const s = new S3270(['-model', '3279-2']);
+    const s = new S3270([], '3279-2');
     // s3270 runs actions one at a time, and Connect() only returns once the
     // session is bound (or in plain 3270 mode), so chain every action behind it.
     let chain: Promise<unknown> = Promise.resolve();

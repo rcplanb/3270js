@@ -512,7 +512,7 @@ export class Terminal {
 
   /** Apply one host record. */
   #hostRecord(record: Uint8Array): { isWrite: boolean; sense?: OutboundSense } {
-    const r = processOutbound(this.screen, record, this.#geometry);
+    const r = processOutbound(this.screen, record, this.#geometry, { color: this.color });
     for (const message of [...r.errors, ...r.warnings]) this.#events.emit('error', { message });
 
     if (r.read) {

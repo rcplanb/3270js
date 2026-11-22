@@ -1,7 +1,8 @@
 /**
  * Differential tests: the same host bytes and the same keystrokes go to 3270js
  * and to s3270 (x3270's scripting emulator); the screen buffers must match
- * cell for cell (characters and field attributes), as must the cursor and the
+ * cell for cell (characters, field attributes, colour, highlighting and
+ * character set), as must the cursor and the
  * keyboard lock state. Skipped with a warning when s3270 is not installed.
  */
 import { readFileSync } from 'node:fs';
@@ -11,7 +12,14 @@ import { Terminal } from '../../src/core/terminal.js';
 import type { Trace } from '../../src/core/trace/index.js';
 import { FakeHost } from '../helpers/fake-host.js';
 import { ReplayHost, hostSteps } from './replay-host.js';
-import { type Cell, S3270, parseReadBuffer, s3270Available } from './s3270.js';
+import {
+  type Cell,
+  S3270,
+  normCharset,
+  normHighlight,
+  parseReadBuffer,
+  s3270Available,
+} from './s3270.js';
 
 const available = s3270Available();
 if (!available) console.warn('s3270 not found: differential tests skipped (brew install x3270)');
@@ -24,11 +32,13 @@ async function pair(trace: Trace) {
   const steps = hostSteps(trace);
   const host = new ReplayHost(steps.prelude);
   await host.listen();
-  const s3 = new S3270();
+  // A 3279 trace is compared as a 3279: a 3278 ignores host colours.
+  const color = /3279/.test(trace.meta.terminalType);
+  const s3 = new S3270([], color ? '3279-2' : '3278-2');
   // s3270 completes Connect() only after the host's first write, so don't wait here.
   const s3connected = s3.run(`Connect(127.0.0.1:${host.port})`);
 
-  const term = new Terminal();
+  const term = new Terminal({ color });
   const fake = new FakeHost();
   const ready = term.connect(fake);
   fake.write(steps.prelude);
@@ -47,7 +57,14 @@ function ourCells(term: Terminal): Cell[] {
   const cells: Cell[] = [];
   for (let a = 0; a < s.size; a++) {
     const fa = s.fieldAttributeAt(a);
-    cells.push(fa === undefined ? { ch: s.charAt(a) } : { fa });
+    const x = s.attributesAt(a);
+    const attrs = {
+      fg: x.foreground,
+      bg: x.background,
+      hl: normHighlight(x.highlighting),
+      cs: normCharset(x.charset),
+    };
+    cells.push(fa === undefined ? { ch: s.charAt(a), ...attrs } : { fa, ...attrs });
   }
   return cells;
 }
@@ -91,7 +108,7 @@ async function compare(
   return { where, problems };
 }
 
-const traces = ['tso-logon', 'ispf-tour'];
+const traces = ['tso-logon', 'ispf-tour', 'ispf-tour-3279'];
 
 describe.skipIf(!available)('differential: host writes (3270js vs s3270)', () => {
   const cleanups: (() => Promise<void>)[] = [];
@@ -185,6 +202,7 @@ describe.skipIf(!available)('differential: keyboard (3270js vs s3270)', () => {
     ['ispf-tour', 'ISPF primary option menu'],
     ['ispf-tour', 'Data set name prefix'],
     ['ispf-tour', 'Row 1 of 62'],
+    ['ispf-tour-3279', 'ISPF primary option menu'],
   ];
 
   for (const [name, marker] of cases) {
