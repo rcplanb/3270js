@@ -71,13 +71,34 @@ describe('Terminal over TN3270E (OS/390 2.10 records)', () => {
     expect(host.takeSent()).toBe('0200000001' + '00' + 'ffef');
   });
 
-  it('sends no positive response when the write produced a reply of its own', () => {
+  it('sends the positive response before a reply the record produced (as s3270 4.5)', () => {
     const { host } = connected();
     host.write(frame(TELNET_BIND));
     host.write(frame('0000020007' + 'f6')); // Read Modified, ALWAYS-RESPONSE
     const sent = host.takeSent();
-    expect(sent.startsWith('0000000000')).toBe(true); // the 3270-DATA reply
-    expect(sent).not.toContain('0200000007');
+    expect(sent.startsWith('0200000007' + '00' + 'ffef' + '0000000000')).toBe(true);
+  });
+
+  it("answers ISPF's Outbound 3270DS + Read Partition Query (the X-clock hang)", () => {
+    const { host, term } = connected();
+    host.write(frame(TSO_BIND));
+    host.write(frame('0000000000' + 'f5c3' + 'c8')); // EW, keyboard restored
+    term.aid('ENTER'); // the operator presses Enter: X clock until the host restores it
+    expect(term.keyboard.isLocked).toBe(true);
+    host.takeSent();
+    // Recorded from OS/390 2.10 ISPF, seq 11: WSF { Outbound 3270DS: W, WCC restore } { Query }.
+    host.write(frame('000002000b' + 'f300064000f1c3000501ff02'));
+    const sent = host.takeSent();
+    expect(sent.startsWith('020000000b' + '00' + 'ffef')).toBe(true); // response first
+    expect(sent.slice(16, 28)).toBe('000000000188'); // then the Query Reply (seq 1: Enter was 0)
+    expect(term.keyboard.isLocked).toBe(false); // the Outbound 3270DS write restored it
+  });
+
+  it('rejects an unsupported structured field with a negative response', () => {
+    const { host } = connected();
+    host.write(frame(TELNET_BIND));
+    host.write(frame('0000010009' + 'f30004' + '7700')); // unknown SF X'77'
+    expect(host.takeSent()).toBe('0200010009' + '00' + 'ffef');
   });
 
   it('sends a negative response: operation check for a bad address, command reject otherwise', () => {

@@ -133,8 +133,8 @@ export class Terminal {
   #bind: BindInfo | undefined;
   /** SSCP-LU: where the host's text ended and the operator's input starts. */
   #sscpStart = 0;
-  /** Records sent so far; used to tell whether a host write was answered. */
-  #recordsSent = 0;
+  /** While set, outgoing data is held here (so a TN3270E response can go first). */
+  #held: Uint8Array[] | undefined;
 
   constructor(options: TerminalOptions = {}) {
     this.model = options.model ?? 2;
@@ -376,9 +376,12 @@ export class Terminal {
         // With BIND-IMAGE agreed, 3270 data before a BIND is ignored (x3270).
         if (binds && !this.#bind) return false;
         this.#mode = 'lu-lu';
-        const sentBefore = this.#recordsSent;
+        // s3270 sends its response before any reply the record produces.
+        const held: Uint8Array[] = (this.#held = []);
         const r = this.#hostRecord(data);
-        this.#respond(header, r.sense, this.#recordsSent > sentBefore);
+        this.#held = undefined;
+        this.#respond(header, r.sense);
+        for (const d of held) this.#send(d);
         return r.isWrite;
       }
       case Tn3270eDataType.BIND_IMAGE:
@@ -406,7 +409,7 @@ export class Terminal {
       case Tn3270eDataType.NVT_DATA:
         this.#mode = 'nvt';
         this.#events.emit('nvt', data);
-        this.#respond(header, undefined, false);
+        this.#respond(header, undefined);
         return false;
       case Tn3270eDataType.RESPONSE:
       case Tn3270eDataType.REQUEST:
@@ -420,11 +423,12 @@ export class Terminal {
   }
 
   /**
-   * TN3270E responses (RFC 2355 §10.4.1), as x3270 sends them: a negative
-   * response for an error unless the host asked for none; a positive one for
-   * ALWAYS-RESPONSE when the record didn't already produce a reply.
+   * TN3270E responses (RFC 2355 §10.4.1), as s3270 4.5 sends them: a negative
+   * response for an error unless the host asked for none; otherwise a positive
+   * one for ALWAYS-RESPONSE, even when the record produced a reply (a read or
+   * a Query Reply). OS/390's ISPF waits for it after its Read Partition Query.
    */
-  #respond(header: Tn3270eHeader, sense: OutboundSense | undefined, replied: boolean): void {
+  #respond(header: Tn3270eHeader, sense: OutboundSense | undefined): void {
     const telnet = this.#telnet;
     if (!telnet?.functions.has(Tn3270eFunction.RESPONSES)) return;
     const wanted = header.responseFlag;
@@ -434,7 +438,7 @@ export class Terminal {
     if (sense) {
       flag = Tn3270eResponseFlag.NEGATIVE;
       status = sense === 'operationCheck' ? 0x02 : 0x00;
-    } else if (wanted === Tn3270eResponseFlag.ALWAYS_RESPONSE && !replied) {
+    } else if (wanted === Tn3270eResponseFlag.ALWAYS_RESPONSE) {
       flag = Tn3270eResponseFlag.POSITIVE;
       status = 0x00; // device end
     } else {
@@ -462,20 +466,32 @@ export class Terminal {
           : readModified(this.screen, this.#lastAid, { all: r.read === 'modifiedAll' });
       this.#sendRecord(reply);
     }
-    if (r.structuredFields) this.#structuredFields(r.structuredFields);
-    const isWrite =
+    let sense = r.sense;
+    let isWrite =
       r.command === 'W' || r.command === 'EW' || r.command === 'EWA' || r.command === 'EAU';
-    if (isWrite) {
+    if (r.structuredFields) {
+      const sf = this.#structuredFields(r.structuredFields);
+      sense ??= sf.sense;
+      isWrite ||= sf.isWrite;
+    }
+    if (isWrite && r.command !== 'WSF') {
       this.keyboard.hostWrite({ keyboardRestore: r.keyboardRestore });
       if (r.keyboardRestore) this.#lastAid = Aid.NONE;
     }
     if (r.alarm) this.#events.emit('alarm', undefined);
-    return r.sense ? { isWrite, sense: r.sense } : { isWrite };
+    return sense ? { isWrite, sense } : { isWrite };
   }
 
   /** Write Structured Field. Phase 1 answers Read Partition Query / Query List. */
-  #structuredFields(payload: Uint8Array): void {
+  /**
+   * Write Structured Field: Read Partition Query / Query List, and Outbound
+   * 3270DS (a write carried in a structured field, which OS/390's ISPF uses).
+   * Anything else is a command reject, as in x3270.
+   */
+  #structuredFields(payload: Uint8Array): { isWrite: boolean; sense?: OutboundSense } {
     const { fields, errors } = parseStructuredFields(payload);
+    let isWrite = false;
+    let sense: OutboundSense | undefined = errors.length ? 'commandReject' : undefined;
     for (const message of errors) this.#events.emit('error', { message });
     for (const f of fields) {
       const type = f.data[1];
@@ -485,13 +501,24 @@ export class Terminal {
       ) {
         const { rows, cols } = this.#geometry.alternate;
         this.#sendRecord(buildQueryReply({ rows, cols, color: this.color }));
+      } else if (
+        f.id === StructuredFieldId.OUTBOUND_3270DS &&
+        f.data[0] === 0x00 &&
+        // W, EW, EWA, EAU (SNA command codes, as x3270 sf_outbound_ds).
+        (type === 0xf1 || type === 0xf5 || type === 0x7e || type === 0x6f)
+      ) {
+        const r = this.#hostRecord(f.data.subarray(1));
+        isWrite ||= r.isWrite;
+        sense ??= r.sense;
       } else {
+        sense ??= 'commandReject';
         const hex = (n: number | undefined) => (n ?? 0).toString(16).toUpperCase().padStart(2, '0');
         this.#events.emit('error', {
           message: `unsupported structured field X'${hex(f.id)}'${f.id === StructuredFieldId.READ_PARTITION ? ` type X'${hex(type)}'` : ''}; ignored`,
         });
       }
     }
+    return sense ? { isWrite, sense } : { isWrite };
   }
 
   #closed(reason?: string): void {
@@ -508,7 +535,6 @@ export class Terminal {
 
   #sendRecord(data: Uint8Array, dataType: number = Tn3270eDataType.DATA_3270): void {
     const telnet = this.#telnet;
-    this.#recordsSent++;
     if (telnet?.tn3270e) {
       // RFC 2355 §10.4: count every 3270-DATA sent, wrapping at 32767.
       const seq = this.#seq;
@@ -527,6 +553,10 @@ export class Terminal {
   }
 
   #send(data: Uint8Array | undefined): void {
+    if (data && this.#held) {
+      this.#held.push(data);
+      return;
+    }
     if (data && this.#transport) {
       this.#events.emit('traffic', { dir: 'terminal', data });
       this.#transport.send(data);
