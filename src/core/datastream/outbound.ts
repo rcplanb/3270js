@@ -12,7 +12,9 @@ import {
   type FieldExtendedAttributes,
   type Screen,
   decodeAddress,
+  eraseAllUnprotected,
   nextAddress,
+  nextUnprotected,
 } from '../screen/index.js';
 import { commandKind, type CommandKind } from './commands.js';
 import { FORMAT_CONTROLS, Order } from './orders.js';
@@ -348,46 +350,6 @@ function readPairs(rec: Uint8Array, i: number, order: string): [number, number][
     pairs.push([rec[at]!, rec[at + 1]!]);
   }
   return pairs;
-}
-
-/**
- * The first data position of the next unprotected field after `from`,
- * searching forward and wrapping; 0 if there is none. Zero-length fields are
- * skipped.
- */
-function nextUnprotected(screen: Screen, from: number): number {
-  const size = screen.size;
-  let a = from;
-  do {
-    const n = nextAddress(a, size);
-    if (
-      screen.isFieldAttribute(a) &&
-      !screen.fieldAt(a)!.protected &&
-      !screen.isFieldAttribute(n)
-    ) {
-      return n;
-    }
-    a = n;
-  } while (a !== from);
-  return 0;
-}
-
-/** Erase All Unprotected. GA23-0059 §3.5.5. */
-function eraseAllUnprotected(screen: Screen): void {
-  if (!screen.isFormatted) {
-    screen.clear();
-    return;
-  }
-  let cursor: number | undefined;
-  for (const field of screen.fields) {
-    if (field.protected) continue;
-    screen.setModified(field.start, false);
-    cursor ??= field.dataStart;
-    for (let k = 0, a = field.dataStart; k < field.length; k++, a = nextAddress(a, screen.size)) {
-      screen.replaceChar(a, 0x00);
-    }
-  }
-  screen.cursor = cursor ?? 0;
 }
 
 const CHAR_ATTRIBUTE_KEYS = new Map<number, keyof CellAttributes>([
