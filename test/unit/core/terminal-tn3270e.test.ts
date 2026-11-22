@@ -124,9 +124,71 @@ describe('Terminal over TN3270E (OS/390 2.10 records)', () => {
     // Only the typed text, no AID or cursor address.
     expect(host.takeSent()).toBe('0700000000' + 'd3d6c7d6d5' + 'ffef');
     expect(term.screen.cursor).toBe(2 * 80); // the next line
-    expect(term.aid('PF3').accepted).toBe(false);
-    term.aid('CLEAR');
+    expect(term.aid('PF3').accepted).toBe(false); // X -f
+    expect(term.oia.state.lock?.symbol).toBe('minusFunction');
+    expect(term.aid('CLEAR').accepted).toBe(false); // ignored until Reset
+    term.press({ type: 'reset' });
+    expect(term.aid('CLEAR').accepted).toBe(true);
     expect(host.takeSent()).toBe('');
     expect(term.text[0]!.trim()).toBe('');
+  });
+});
+
+describe('the status line over TN3270E', () => {
+  it('shows B, the LU, and the owner moving from unbound to the application', () => {
+    const { host, term } = connected();
+    expect(term.oia.state).toMatchObject({ tn3270e: true, owner: 'unbound', luName: 'SC0TCP01' });
+    host.write(frame(TELNET_BIND));
+    host.write(frame('000000000005c3' + 'c8c5d3d3d6'));
+    expect(term.oia.state.owner).toBe('lu-lu');
+    host.write(frame(UNBIND));
+    expect(term.oia.state.owner).toBe('unbound');
+    host.write(frame('0700000000' + 'e4e2e2'));
+    expect(term.oia.state.owner).toBe('sscp');
+  });
+
+  it('is plain A with no LU on a TN3270 session', () => {
+    const host = new FakeHost();
+    const term = new Terminal({ tn3270e: false });
+    void term.connect(host);
+    for (const c of ['fffd18', 'fffa1801fff0', 'fffb00fffd00', 'fffb19fffd19']) host.write(c);
+    expect(term.oia.state).toMatchObject({
+      connection: 'connected',
+      tn3270e: false,
+      owner: 'lu-lu',
+    });
+    expect(term.oia.state.luName).toBeUndefined();
+  });
+});
+
+describe('asking for an LU on plain TN3270', () => {
+  it('sends type@LU in TERMINAL-TYPE (RFC 1646), and shows the LU', () => {
+    const host = new FakeHost();
+    const term = new Terminal({ color: true, luName: 'CONS0010', tn3270e: false });
+    void term.connect(host);
+    host.write('fffd18');
+    host.takeSent();
+    host.write('fffa1801fff0');
+    expect(Buffer.from(host.takeSent(), 'hex').toString('latin1')).toContain(
+      'IBM-3279-2-E@CONS0010',
+    );
+    for (const c of ['fffb00fffd00', 'fffb19fffd19']) host.write(c);
+    expect(term.oia.state).toMatchObject({ tn3270e: false, luName: 'CONS0010' });
+  });
+});
+
+describe('a refused LU on plain TN3270', () => {
+  it('disconnects with the reason when the host asks for the terminal type again (as OS/390 does)', async () => {
+    const host = new FakeHost();
+    const term = new Terminal({ luName: 'SC0TCP03', tn3270e: false });
+    const reasons: (string | undefined)[] = [];
+    term.on('disconnect', (d) => reasons.push(d.reason));
+    const connected = term.connect(host);
+    host.write('fffd18');
+    host.write('fffa1801fff0'); // we send type@SC0TCP03
+    host.write('fffa1801fff0'); // OS/390: try another LU
+    await expect(connected).rejects.toThrow('the host refused LU SC0TCP03');
+    expect(reasons).toEqual(['the host refused LU SC0TCP03']);
+    expect(host.closed).toBe(true);
   });
 });

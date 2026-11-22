@@ -9,6 +9,8 @@ const base: OiaState = {
   insert: false,
   cursor: { row: 22, col: 11 },
   model: '3278-2',
+  tn3270e: false,
+  owner: 'lu-lu',
 };
 const show = (cells: OiaCell[], from: number, n: number) =>
   cells
@@ -35,6 +37,34 @@ describe('oiaCells (3174 layout, x3270 symbol sequences)', () => {
     expect(c).toHaveLength(80);
     expect(show(c, 0, 3)).toBe('<box4><underA><boxSolid>');
     expect(show(c, 73, 7)).toBe('023/012');
+  });
+
+  it('shows TN3270E: an underlined B, the session owner, and the LU at cols-25', () => {
+    const e = { ...base, tn3270e: true, luName: 'SC0TCP01' };
+    expect(show(oiaCells({ ...e, owner: 'lu-lu' }, { cols: 80 }), 0, 3)).toBe(
+      '<box4><underB><boxSolid>',
+    );
+    expect(show(oiaCells({ ...e, owner: 'sscp' }, { cols: 80 }), 0, 3)).toBe(
+      '<box4><underB><boxHuman>',
+    );
+    expect(show(oiaCells({ ...e, owner: 'unbound' }, { cols: 80 }), 0, 3)).toBe(
+      '<box4><underB><boxQuestion>',
+    );
+    expect(show(oiaCells({ ...e, owner: 'nvt' }, { cols: 80 }), 2, 1)).toBe('N');
+    expect(show(oiaCells({ ...e, owner: 'lu-lu' }, { cols: 80 }), 55, 8)).toBe('SC0TCP01');
+    expect(show(oiaCells({ ...e, owner: 'lu-lu' }, { cols: 132 }), 107, 8)).toBe('SC0TCP01');
+  });
+
+  it('shows X -f for the minus function, and X [TN3270E] while unbound', () => {
+    const minus = { ...base, lock: { symbol: 'minusFunction', reason: 'minusFunction' } } as const;
+    expect(show(oiaCells(minus, { cols: 80 }), 8, 4)).toBe('<lock> -f');
+    const unbound = {
+      ...base,
+      tn3270e: true,
+      owner: 'unbound',
+      lock: { symbol: 'system', reason: 'awaitingFirst' },
+    } as const;
+    expect(show(oiaCells(unbound, { cols: 80 }), 8, 11)).toBe('<lock> [TN3270E]');
   });
 
   it('shows a boxed question mark while connecting, and nothing when disconnected', () => {
@@ -80,6 +110,20 @@ describe('oiaCells (3174 layout, x3270 symbol sequences)', () => {
 });
 
 describe('oiaDescription', () => {
+  it('describes a TN3270E session and the minus function', () => {
+    expect(
+      oiaDescription({
+        ...base,
+        tn3270e: true,
+        owner: 'sscp',
+        luName: 'SC0TCP01',
+        lock: { symbol: 'minusFunction', reason: 'minusFunction' },
+      }),
+    ).toBe(
+      'Connected; TN3270E LU SC0TCP01, owned by the SSCP (VTAM); input inhibited: function not available; row 23, column 12',
+    );
+  });
+
   it('describes the status line in words', () => {
     expect(
       oiaDescription({

@@ -98,7 +98,7 @@ can run in parallel with it.
   - Fixtures: `test/traces/os390/` — the USS screen and the unanswered TSO logon,
     recorded on the museum's OS/390 2.10 (no passwords), replayed in tests.
 
-- [ ] **3. Session states, status line, minus function**
+- [x] **3. Session states, status line, minus function**
   - Acceptance:
     - Track unbound, SSCP-LU and LU-LU states from BIND and UNBIND.
     - SSCP-LU data shown as an unformatted screen, with x3270's keyboard rules for that
@@ -112,6 +112,19 @@ can run in parallel with it.
       Examples: Attn on an unbound session; an AID other than Enter or Clear in
       SSCP-LU mode. Reset clears it.
   - Verify: unit tests; interop harness screens; OIA glyph tests.
+  - Done: `OiaState` gains `tn3270e` and `owner` (lu-lu / sscp / unbound / nvt) and
+    carries the LU; both renderers and the text-only status show them as x3270/c3270
+    do (`X [TN3270E]` while unbound). `minusFunction` is a new operator error
+    (`Keyboard.minusFunction()`), used for SSCP-LU AIDs other than Enter and Clear;
+    locked SSCP-LU AIDs are ignored until Reset. The demo has an **LU** box (and
+    `?lu=`) for asking for a specific LU, e.g. a console, and says why if the host
+    refused it.
+  - Named LUs on plain TN3270 too: `type@LU` in TERMINAL-TYPE (RFC 1646, as x3270;
+    Hercules picks a device this way). A repeated TERMINAL-TYPE SEND means the LU was
+    refused: disconnect with the reason, as s3270 does. Live on OS/390 2.10: its
+    TN3270E server rejects every CONNECT (`INV-NAME`, even for its own pool LUs) and
+    then the `type@LU` request, so named LUs there need TN3270 server configuration;
+    both 3270js and s3270 report it the same way.
 
 - [ ] **4. Attn and SysReq on TN3270E**
   - Acceptance:

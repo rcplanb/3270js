@@ -14,7 +14,7 @@ import {
   type KeyboardOptions,
   type KeyResult,
 } from './keyboard/index.js';
-import { OiaModel, type ConnectionState, type OiaState } from './oia/index.js';
+import { OiaModel, type ConnectionState, type OiaOwner, type OiaState } from './oia/index.js';
 import {
   ReadPartitionType,
   StructuredFieldId,
@@ -54,7 +54,11 @@ export interface TerminalOptions {
    * that don't offer it (Hercules, for one) get plain TN3270 either way.
    */
   tn3270e?: boolean;
-  /** TN3270E: ask the host for this LU (device or pool name) with CONNECT. */
+  /**
+   * Ask the host for this LU (device or pool name), e.g. a console. TN3270E
+   * sends it with CONNECT; plain TN3270 appends it to the terminal type as
+   * `type@LU` (RFC 1646), which Hercules uses to pick a device.
+   */
   luName?: string;
   /** Code page id or object. Default `cp037`. */
   codePage?: string | CodePage;
@@ -203,6 +207,7 @@ export class Terminal {
     this.#transport = transport;
     this.#telnet = createTelnetSession({
       terminalType: this.terminalType,
+      ...(this.luName === undefined ? {} : { luName: this.luName }),
       ...(this.#tn3270e
         ? {
             tn3270e: {
@@ -233,9 +238,7 @@ export class Terminal {
 
   /** Press a key. Anything the key sends goes to the host. */
   press(action: KeyAction): KeyResult {
-    if (action.type === 'aid' && this.sessionMode === 'sscp-lu' && !this.keyboard.isLocked) {
-      return this.#sscpAid(action.key);
-    }
+    if (action.type === 'aid' && this.sessionMode === 'sscp-lu') return this.#sscpAid(action.key);
     const result = this.keyboard.press(action);
     if (action.type === 'aid' && result.accepted) this.#lastAid = aidForKey(action.key);
     for (const out of result.outputs) {
@@ -294,6 +297,14 @@ export class Terminal {
    * minus-function indicator arrives in task 3).
    */
   #sscpAid(key: AidKey): KeyResult {
+    // Locked (e.g. by X -f): AID keys are ignored until Reset, as in x3270.
+    if (this.keyboard.isLocked) {
+      return {
+        accepted: false,
+        outputs: [],
+        rejected: this.keyboard.inhibit ?? 'operatorError',
+      };
+    }
     const screen = this.screen;
     if (key === 'CLEAR') {
       screen.clear();
@@ -310,8 +321,9 @@ export class Terminal {
       this.#sscpStart = screen.cursor;
       this.#sendRecord(input, Tn3270eDataType.SSCP_LU_DATA);
     } else {
+      const refused = this.keyboard.minusFunction();
       this.#refresh(false);
-      return { accepted: false, outputs: [], rejected: 'operatorError' };
+      return refused;
     }
     this.#refresh(false);
     return { accepted: true, outputs: [] };
@@ -359,6 +371,13 @@ export class Terminal {
           break;
         case 'option':
           break;
+        case 'luRefused': {
+          // As s3270 ("Cannot connect to specified LU"): give up and say why.
+          const transport = this.#transport;
+          this.#closed(`the host refused LU ${e.luName}`);
+          transport?.close();
+          return;
+        }
       }
     }
     this.#refresh(hostWrote);
@@ -563,6 +582,17 @@ export class Terminal {
     }
   }
 
+  /** The TN3270E part of the status line: B, the session owner and the LU. */
+  #oiaSession(): { tn3270e: boolean; owner: OiaOwner; luName?: string } {
+    const session = this.tn3270e;
+    if (!session)
+      return { tn3270e: false, owner: 'lu-lu', ...(this.luName ? { luName: this.luName } : {}) };
+    const owner: OiaOwner = (
+      { 'lu-lu': 'lu-lu', 'sscp-lu': 'sscp', unbound: 'unbound', nvt: 'nvt' } as const
+    )[this.#mode];
+    return { tn3270e: true, owner, ...(session.luName ? { luName: session.luName } : {}) };
+  }
+
   /** Update the OIA and fire render/unlock/settled events as needed. */
   #refresh(hostWrote: boolean): void {
     const connection: ConnectionState = this.connected
@@ -579,6 +609,7 @@ export class Terminal {
       cursor: this.screen.cursor,
       cols: this.screen.cols,
       model: `${this.color ? 3279 : 3278}-${this.model}`,
+      ...this.#oiaSession(),
     });
     if (this.oia.state !== before) this.#events.emit('oia', this.oia.state);
 

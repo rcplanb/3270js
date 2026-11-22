@@ -70,7 +70,17 @@ function teardown() {
 async function connect() {
   const model = Number($('model').value);
   const color = $('color').checked;
-  const term = new Terminal({ model, color, keyboard: { blankFill: $('blankfill').checked } });
+  const luName = $('lu').value.trim().toUpperCase();
+  if (luName && !/^[\x21-\x7e]+$/.test(luName)) {
+    status('LU names are letters, digits and symbols, with no spaces.');
+    return;
+  }
+  const term = new Terminal({
+    model,
+    color,
+    ...(luName ? { luName } : {}),
+    keyboard: { blankFill: $('blankfill').checked },
+  });
   $('terminal').replaceChildren();
   const renderer = makeRenderer({
     displayMode: color ? 'color' : $('display').value,
@@ -95,21 +105,30 @@ async function connect() {
     status(`Disconnected${e.reason ? `: ${e.reason}` : ''}.`);
     teardown();
   });
-  term.on('error', (e) => console.warn('3270:', e.message));
+  let refused; // why the host refused TN3270E, e.g. an unknown or busy LU
+  term.on('error', (e) => {
+    console.warn('3270:', e.message);
+    if (e.message.startsWith('TN3270E')) refused = e.message;
+  });
   term.on('alarm', () =>
     renderer.element.animate([{ filter: 'brightness(2)' }, { filter: 'none' }], 200),
   );
 
   $('connect').textContent = 'Disconnect';
   $('trace').disabled = false;
-  status(`Connecting to ${$('target').value} as ${term.terminalType}…`);
+  status(`Connecting to ${$('target').value}${luName ? `, LU ${luName}` : ''}…`);
   try {
     await term.connect(
       new WebSocketTransport(
         `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/tn3270?target=${encodeURIComponent($('target').value)}`,
       ),
     );
-    status(`Connected as ${term.terminalType}.`);
+    const e = term.tn3270e;
+    status(
+      e
+        ? `Connected over TN3270E as ${e.deviceType}${e.luName ? `, LU ${e.luName}` : ''}.`
+        : `Connected over TN3270 as ${term.terminalType}.${refused ? ` ${refused}.` : ''}`,
+    );
     mapper.focus();
   } catch (e) {
     status(String(e.message ?? e));
@@ -134,10 +153,11 @@ $('trace').onclick = () => {
   URL.revokeObjectURL(a.href);
 };
 
-// ?autoconnect connects on load; ?color=1 / ?model=N preset the options.
+// ?autoconnect connects on load; ?color=1 / ?model=N / ?lu=NAME preset the options.
 const params = new URLSearchParams(location.search);
 if (params.has('model')) $('model').value = params.get('model');
 if (params.has('renderer')) $('renderer').value = params.get('renderer');
 if (params.has('target')) $('target').value = params.get('target');
 if (params.get('color') === '1') $('color').checked = true;
+if (params.has('lu')) $('lu').value = params.get('lu');
 if (params.has('autoconnect')) void connect();

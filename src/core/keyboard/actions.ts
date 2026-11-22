@@ -52,7 +52,13 @@ export type OperatorError =
   /** Non-numeric character in a numeric field, with numeric lock on. */
   | 'numeric'
   /** Insert with no room left in the field ("too much"). */
-  | 'overflow';
+  | 'overflow'
+  /**
+   * The key's function isn't available in this session state ("minus
+   * function", X -f): e.g. a PF key while VTAM's SSCP owns the session, or
+   * Attn on an unbound TN3270E session.
+   */
+  | 'minusFunction';
 
 export type KeyOutput =
   /** An inbound 3270 record to send (not yet telnet-framed). */
