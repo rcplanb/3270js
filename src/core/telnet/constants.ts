@@ -35,3 +35,61 @@ export const TerminalType = {
   IS: 0,
   SEND: 1,
 } as const;
+
+/** TN3270E subnegotiation commands. RFC 2355 §3. */
+export const Tn3270eOp = {
+  ASSOCIATE: 0,
+  CONNECT: 1,
+  DEVICE_TYPE: 2,
+  FUNCTIONS: 3,
+  IS: 4,
+  REASON: 5,
+  REJECT: 6,
+  REQUEST: 7,
+  SEND: 8,
+} as const;
+
+/** DEVICE-TYPE REJECT reason codes. RFC 2355 §3. */
+export const Tn3270eReason = {
+  CONN_PARTNER: 0,
+  DEVICE_IN_USE: 1,
+  INV_ASSOCIATE: 2,
+  INV_NAME: 3,
+  INV_DEVICE_TYPE: 4,
+  TYPE_NAME_ERROR: 5,
+  UNKNOWN_ERROR: 6,
+  UNSUPPORTED_REQ: 7,
+} as const;
+
+/** TN3270E functions. RFC 2355 §3. */
+export const Tn3270eFunction = {
+  BIND_IMAGE: 0,
+  DATA_STREAM_CTL: 1,
+  RESPONSES: 2,
+  SCS_CTL_CODES: 3,
+  SYSREQ: 4,
+} as const;
+
+/** TN3270E message header DATA-TYPE values. RFC 2355 §8.1.1. */
+export const Tn3270eDataType = {
+  DATA_3270: 0x00,
+  SCS_DATA: 0x01,
+  RESPONSE: 0x02,
+  BIND_IMAGE: 0x03,
+  UNBIND: 0x04,
+  NVT_DATA: 0x05,
+  REQUEST: 0x06,
+  SSCP_LU_DATA: 0x07,
+  PRINT_EOJ: 0x08,
+} as const;
+
+/** RESPONSE-FLAG values on 3270-DATA and SCS-DATA. RFC 2355 §8.1.3. */
+export const Tn3270eResponseFlag = {
+  NO_RESPONSE: 0x00,
+  ERROR_RESPONSE: 0x01,
+  ALWAYS_RESPONSE: 0x02,
+  /** On a RESPONSE message. */
+  POSITIVE: 0x00,
+  /** On a RESPONSE message. */
+  NEGATIVE: 0x01,
+} as const;

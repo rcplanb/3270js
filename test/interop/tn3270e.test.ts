@@ -2,7 +2,7 @@
  * TN3270E interop (RFC 2355): every client in CLIENTS must behave the same
  * against the scripted test host. s3270 is the reference.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it as base } from 'vitest';
 import {
   DataType,
   Fn,
@@ -26,6 +26,18 @@ const settle = () => new Promise((r) => setTimeout(r, 200));
 
 describe.each(CLIENTS)('TN3270E interop: $name', (factory) => {
   const { available } = factory;
+  /** Skip a test this client can't pass yet; the plan task that brings it is in `pending`. */
+  const it = Object.assign(
+    (name: string, fn: () => Promise<void>) =>
+      base(factory.pending?.[name] ? `${name} (pending: ${factory.pending[name]})` : name, fn),
+    {
+      skipIf: (cond: boolean) => (name: string, fn: () => Promise<void>) =>
+        base.skipIf(cond || Boolean(factory.pending?.[name]))(
+          factory.pending?.[name] ? `${name} (pending: ${factory.pending[name]})` : name,
+          fn,
+        ),
+    },
+  );
   let host: StartedHost | undefined;
   let client: InteropClient | undefined;
   afterEach(async () => {
@@ -94,6 +106,27 @@ describe.each(CLIENTS)('TN3270E interop: $name', (factory) => {
     s.send3270([0xf1, 0xc3, 0x11, 0x40, 0x40, ...ebcdic('HELLO')]);
     await settle();
     expect((await client!.text())[0]!.trimEnd()).toBe('HELLO');
+  });
+
+  it.skipIf(!available)('frames input as 3270-DATA with rising sequence numbers', async () => {
+    const s = await session();
+    s.bind();
+    s.send3270(HELLO);
+    await settle();
+    // s3270's Enter() returns only once the host unlocks the keyboard, so
+    // answer each Enter while it is still pending.
+    for (let n = 1; n <= 2; n++) {
+      const pressed = client!.enter();
+      await s.waitFor(() => s.events.filter(isRecord).length === n);
+      s.send3270(HELLO);
+      await pressed;
+    }
+    const records = s.events.filter(isRecord);
+    expect(records.map((e) => e.record.header)).toEqual([
+      { dataType: DataType.DATA_3270, requestFlag: 0, responseFlag: 0, seq: 0 },
+      { dataType: DataType.DATA_3270, requestFlag: 0, responseFlag: 0, seq: 1 },
+    ]);
+    expect(records[0]!.record.data[0]).toBe(0x7d); // the Enter AID
   });
 
   it.skipIf(!available)('sends a positive response when asked ALWAYS-RESPONSE', async () => {

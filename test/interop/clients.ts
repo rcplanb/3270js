@@ -3,6 +3,8 @@
  * is written once against `InteropClient`; s3270 is the reference, and 3270js
  * joins the list when it speaks TN3270E (Phase 2 task 1).
  */
+import { Terminal } from '../../src/core/terminal.js';
+import { TcpTransport } from '../../src/transport/node/tcp.js';
 import { S3270, s3270Available } from '../differential/s3270.js';
 
 export interface InteropClient {
@@ -19,6 +21,8 @@ export interface InteropClient {
 export interface ClientFactory {
   name: string;
   available: boolean;
+  /** Tests (by name) this client can't pass yet, with the plan task that brings them. */
+  pending?: Record<string, string>;
   create(): InteropClient;
 }
 
@@ -52,4 +56,53 @@ const s3270: ClientFactory = {
   },
 };
 
-export const CLIENTS: ClientFactory[] = [s3270];
+const settle = () => new Promise((r) => setTimeout(r, 100));
+
+const t3270js: ClientFactory = {
+  name: '3270js',
+  available: true,
+  pending: {
+    'ignores 3270 data until BIND': 'task 2',
+    'sends a positive response when asked ALWAYS-RESPONSE': 'task 2',
+    'sends a negative response for a bad buffer address': 'task 2',
+    'shows SSCP-LU data and sends input back as SSCP-LU data': 'task 2',
+    'clears the screen on UNBIND': 'task 2',
+    'sends Attn as IAC IP and SysReq as IAC AO': 'task 4',
+  },
+  create() {
+    let term: Terminal | undefined;
+    const t = () => {
+      if (!term) throw new Error('not connected');
+      return term;
+    };
+    return {
+      connect: (port, lu) => {
+        term = new Terminal({ model: 2, color: true, ...(lu ? { luName: lu } : {}) });
+        void term.connect(new TcpTransport({ host: '127.0.0.1', port })).catch(() => undefined);
+        return Promise.resolve();
+      },
+      text: async () => {
+        await settle();
+        return t().text;
+      },
+      attn: async () => {
+        t().press({ type: 'attn' });
+        await settle();
+      },
+      sysReq: async () => {
+        t().aid('SYSREQ');
+        await settle();
+      },
+      enter: async () => {
+        t().aid('ENTER');
+        await settle();
+      },
+      close: () => {
+        term?.disconnect();
+        return Promise.resolve();
+      },
+    };
+  },
+};
+
+export const CLIENTS: ClientFactory[] = [s3270, t3270js];

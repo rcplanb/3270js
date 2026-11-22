@@ -104,7 +104,7 @@ describe('option negotiation', () => {
     const t = negotiated();
     const ev = t.receive(Uint8Array.of(IAC, DONT, BINARY));
     expect(sends(ev)).toBe('fffc00');
-    expect(ev).toContainEqual({ type: 'mode', in3270: false });
+    expect(ev).toContainEqual({ type: 'mode', in3270: false, tn3270e: false });
     expect(t.in3270).toBe(false);
     expect(sends(t.receive(Uint8Array.of(IAC, WONT, OPT_EOR)))).toBe('fffe19');
   });
