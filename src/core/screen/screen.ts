@@ -7,7 +7,7 @@
  * changed so renderers can repaint just those.
  */
 import type { CodePage } from '../codepage/index.js';
-import { isGraphic } from '../codepage/index.js';
+import { displayChar } from '../codepage/index.js';
 import { isValidAddress } from './address.js';
 import {
   type CellAttributes,
@@ -318,7 +318,7 @@ export class Screen {
         const a = r * this.#cols + c;
         const byte = this.#chars[a]!;
         const hidden = !options.showHidden && this.#displayAt(a) === 'hidden';
-        line += this.#isFa[a] || hidden || !isGraphic(byte) ? ' ' : codePage.toUnicode(byte);
+        line += this.#isFa[a] || hidden ? ' ' : (displayChar(byte, this.#cs[a]!, codePage) ?? ' ');
       }
       lines.push(line);
     }

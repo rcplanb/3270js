@@ -163,11 +163,15 @@ can run in parallel with it.
     - A code-page picker in the demo.
   - Verify: unit tests (round trips, known positions).
 
-- [ ] **10. APL glyphs**
+- [x] **10. APL glyphs**
   - Acceptance:
     - GE and APL-set characters are drawn as the APL characters (⍴ ⍳ ∇ …) rather than
       their base code-page meaning, using a CP310-to-Unicode table.
   - Verify: unit tests, screenshot.
+  - Done early: OS/390 ISPF draws its action-bar separator and pop-up boxes with GE
+    (`s` and `e` for ─ and │, `E N D M` for the corners). `scripts/gen-apl.py` generates
+    the CP310 table from x3270's `apl2uc[]`; `displayChar()` serves `toText` and both
+    renderers. The same ISPF screen replayed into s3270 matches cell for cell.
 
 - [ ] **11. Optional 3270 font** (ADR 0001)
   - Acceptance:
