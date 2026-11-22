@@ -75,6 +75,10 @@ _Already delivered during Phase 1:_ `onKeyboardUnlock` and `onScreenSettled`, pr
 - **Observer mode:** a passive server-side copy that follows both directions of a session (decided at Open Question 1), built on `parseInbound` and the trace recorder's shadow screen.
 - **SimH Assist integration:** prompt detection from screen state, Docent field injection, password-safe session logging and replay.
 - **A public scripting helper**, for example `waitFor(text)` and `then type`. It should include the recovery patterns the live tests learned: RECONNECT, PA2 to reshow, Clear, `CANCEL`, and TSO `***` paging.
+- **Docent actions:** fill fields and press an AID on the visitor's behalf, applied by the browser's terminal and never into hidden fields.
+- **Recordings for existing players** _(asked 2026-11-22)_: export a trace as an asciinema `.cast` (ANSI repaints, for asciinema-player and MP4), plus a faithful 3270 replay player.
+
+Plan: [docs/PLAN-phase3.md](docs/PLAN-phase3.md).
 
 ### Phase 4: Graphics (GDDM) — far future _(logged 2026-11-22)_
 
