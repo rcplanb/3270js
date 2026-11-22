@@ -1,10 +1,16 @@
-// Fail if any committed trace contains a known default password, in ASCII or
-// EBCDIC (CP037) hex. Recording redacts non-display fields, but a password
-// typed into a visible field would not be caught by that.
+// Fail if any committed trace or fixture contains a known TK5/MVS default
+// password, in ASCII or EBCDIC (CP037) hex. Recording already redacts
+// non-display fields; this catches a password typed into a visible field.
+//
+// In traces only what the terminal sent is scanned: that is where typed
+// passwords appear, and host output is full of names like SYS1.PROCLIB.
+// IBMUSER's default password, SYS1, can't be scanned for at all (it is the
+// prefix of every system data set name, which people type too); its
+// protection is the non-display redaction.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const PASSWORDS = ['CUL8TR', 'PASS4U', 'IBMPASS', 'SYS1', 'SECRET'];
+const PASSWORDS = ['CUL8TR', 'PASS4U', 'IBMPASS', 'SECRET'];
 const EBCDIC = {
   A: 'c1',
   B: 'c2',
@@ -61,7 +67,16 @@ for (const dir of ['test/traces', 'test/fixtures']) walk(dir);
 
 let bad = 0;
 for (const f of files) {
-  const text = readFileSync(f, 'utf8').toLowerCase();
+  const raw = readFileSync(f, 'utf8');
+  const json = JSON.parse(raw);
+  const text = (
+    json.format === '3270js-trace'
+      ? json.events
+          .filter((e) => e.dir === 'terminal')
+          .map((e) => e.hex)
+          .join(' ')
+      : raw
+  ).toLowerCase();
   for (const [pw, needle] of needles) {
     if (text.includes(needle.toLowerCase())) {
       console.error(`${f}: contains password ${pw} (as "${needle}")`);
