@@ -2,7 +2,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['test/unit/**/*.test.ts', 'test/differential/**/*.test.ts'],
+    include: [
+      'test/unit/**/*.test.ts',
+      'test/differential/**/*.test.ts',
+      'test/interop/**/*.test.ts',
+    ],
     passWithNoTests: true,
     // Differential tests drive a real s3270 process.
     testTimeout: 60_000,

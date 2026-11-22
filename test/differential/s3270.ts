@@ -46,6 +46,11 @@ export class S3270 {
     return this.#lines.shift()!;
   }
 
+  /** Stop at once, without waiting for actions in progress. */
+  kill(): void {
+    this.#proc.kill();
+  }
+
   async close(): Promise<void> {
     try {
       await this.run('Quit()');
