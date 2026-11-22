@@ -38,6 +38,14 @@ export const DOM_CSS = `
   white-space: pre;
   color: var(--t3270-oia);
 }
+.t3270-glyph {
+  display: inline-block;
+  width: 1ch;
+  height: var(--t3270-line);
+  vertical-align: top;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
 .t3270-sr-only {
   position: absolute;
   width: 1px;

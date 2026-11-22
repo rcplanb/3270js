@@ -8,13 +8,12 @@ import type { OiaLockSymbol, OiaState } from '../../core/oia/index.js';
 import type { Terminal } from '../../core/terminal.js';
 import { type DisplayMode, type Run, rowRuns } from '../cell-style.js';
 import type { CellMetrics, Renderer, RendererOptions } from '../renderer.js';
+import { OIA_GLYPHS, OIA_GLYPH_SIZE } from '../oia-glyphs.js';
+import { type OiaCell, oiaCells, oiaDescription } from '../oia-layout.js';
 import { DEFAULT_THEME, type Theme } from '../theme.js';
 import { DOM_CSS } from './styles.js';
 
-/**
- * Status-line wording for each lock symbol, as c3270 shows them in a text
- * terminal. The glyph-based OIA comes with the font decision (task 17).
- */
+/** Status-line wording for each lock symbol when glyphs are off (as c3270 shows them). */
 const LOCK_TEXT: Record<OiaLockSymbol, string> = {
   system: 'X SYSTEM',
   clock: 'X Wait',
@@ -31,7 +30,10 @@ export class DomRenderer implements Renderer {
   readonly #cursorEl: HTMLElement;
   readonly #oiaEl: HTMLElement;
   readonly #liveEl: HTMLElement;
+  readonly #oiaTextEl: HTMLElement;
   readonly #theme: Theme;
+  readonly #oiaGlyphs: boolean;
+  #shift = false;
   #rows: HTMLElement[] = [];
   #cols = 0;
   #displayMode: DisplayMode | undefined;
@@ -42,6 +44,7 @@ export class DomRenderer implements Renderer {
     this.#doc = container.ownerDocument;
     this.#theme = options.theme ?? DEFAULT_THEME;
     this.#displayMode = options.displayMode;
+    this.#oiaGlyphs = options.oiaGlyphs ?? true;
     injectStyles(this.#doc);
 
     const el = (cls: string) => {
@@ -70,12 +73,13 @@ export class DomRenderer implements Renderer {
     );
     this.#oiaEl = el('t3270-oia');
     this.#oiaEl.setAttribute('aria-hidden', 'true');
+    this.#oiaTextEl = el('t3270-sr-only');
     this.#liveEl = el('t3270-sr-only');
     this.#liveEl.setAttribute('aria-live', 'polite');
     this.#liveEl.setAttribute('aria-atomic', 'true');
 
     this.#screenEl.append(this.#cursorEl);
-    this.element.append(this.#screenEl, this.#oiaEl, this.#liveEl);
+    this.element.append(this.#screenEl, this.#oiaEl, this.#oiaTextEl, this.#liveEl);
     container.append(this.element);
   }
 
@@ -122,6 +126,12 @@ export class DomRenderer implements Renderer {
   setDisplayMode(mode: DisplayMode): void {
     this.#displayMode = mode;
     this.refresh();
+  }
+
+  setShift(down: boolean): void {
+    if (down === this.#shift) return;
+    this.#shift = down;
+    if (this.#term) this.#paintOia(this.#term.oia.state);
   }
 
   focus(): void {
@@ -195,17 +205,41 @@ export class DomRenderer implements Renderer {
 
   #paintOia(state: OiaState): void {
     const cols = this.#cols || 80;
-    const line = Array.from({ length: cols }, () => ' ');
-    const put = (at: number, text: string) => {
-      for (let i = 0; i < text.length && at + i < cols; i++) line[at + i] = text[i]!;
+    this.#oiaTextEl.textContent = oiaDescription(state);
+    if (!this.#oiaGlyphs) {
+      this.#oiaEl.textContent = wordsOia(state, cols);
+      return;
+    }
+    const cells = oiaCells(state, { cols, shift: this.#shift });
+    const nodes: Node[] = [];
+    let run = '';
+    const flush = () => {
+      if (run) nodes.push(this.#doc.createTextNode(run));
+      run = '';
     };
-    if (state.connection === 'connected') put(0, '4A');
-    else if (state.connection === 'connecting') put(0, '4?');
-    if (state.lock) put(8, LOCK_TEXT[state.lock.symbol]);
-    if (state.insert) put(51, '^');
-    const pos = (n: number) => String(n + 1).padStart(3, '0');
-    put(cols - 7, `${pos(state.cursor.row)}/${pos(state.cursor.col)}`);
-    this.#oiaEl.textContent = line.join('');
+    for (const cell of cells) {
+      if (cell && 'glyph' in cell) {
+        flush();
+        nodes.push(this.#glyph(cell));
+      } else {
+        run += cell ? cell.char : ' ';
+      }
+    }
+    flush();
+    this.#oiaEl.replaceChildren(...nodes);
+  }
+
+  #glyph(cell: Extract<OiaCell, { glyph: string }>): Element {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = this.#doc.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${OIA_GLYPH_SIZE.width} ${OIA_GLYPH_SIZE.height}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('class', 't3270-glyph');
+    svg.setAttribute('data-glyph', cell.glyph);
+    const path = this.#doc.createElementNS(NS, 'path');
+    path.setAttribute('d', OIA_GLYPHS[cell.glyph]);
+    svg.append(path);
+    return svg;
   }
 
   #announce(): void {
@@ -214,6 +248,20 @@ export class DomRenderer implements Renderer {
       .trim();
     this.#liveEl.textContent = text;
   }
+}
+
+function wordsOia(state: OiaState, cols: number): string {
+  const line = Array.from({ length: cols }, () => ' ');
+  const put = (at: number, text: string) => {
+    for (let i = 0; i < text.length && at + i < cols; i++) line[at + i] = text[i]!;
+  };
+  if (state.connection === 'connected') put(0, '4A');
+  else if (state.connection === 'connecting') put(0, '4?');
+  if (state.lock) put(8, LOCK_TEXT[state.lock.symbol]);
+  if (state.insert) put(cols - 29, '^');
+  const pos = (n: number) => String(n + 1).padStart(3, '0');
+  put(cols - 7, `${pos(state.cursor.row)}/${pos(state.cursor.col)}`);
+  return line.join('');
 }
 
 function injectStyles(doc: Document): void {

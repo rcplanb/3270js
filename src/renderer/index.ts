@@ -3,3 +3,7 @@ export type { CellStyle, CellStyleOptions, DisplayMode, Run } from './cell-style
 export { DEFAULT_THEME } from './theme.js';
 export type { ColorSlot, Theme } from './theme.js';
 export type { CellMetrics, Renderer, RendererOptions } from './renderer.js';
+export { OIA_GLYPHS, OIA_GLYPH_SIZE } from './oia-glyphs.js';
+export type { OiaGlyph } from './oia-glyphs.js';
+export { oiaCells, oiaDescription } from './oia-layout.js';
+export type { OiaCell, OiaLayoutOptions } from './oia-layout.js';
