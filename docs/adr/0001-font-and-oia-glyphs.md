@@ -1,6 +1,6 @@
 # ADR 0001: Font and status-line (OIA) glyphs
 
-- **Status:** proposed, awaiting sign-off (Richard)
+- **Status:** accepted (Richard, 2026-11-22)
 - **Date:** 2026-11-22
 - **Plan task:** 17. Blocks task 18 (canvas renderer) and the glyph version of the DOM status line.
 
@@ -42,7 +42,7 @@ BDF for this ADR):
 - **Row 2:** keyright, underA, underB, upshift, downshift, rightarrow,
   leftarrow, commhi, commlo, commjag, badcommhi, magcard, plusminus
 
-## Decision (proposed)
+## Decision
 
 1. **Text font.** Offer the 3270 font as an *optional* asset, not baked into
    the bundle:
@@ -83,9 +83,28 @@ BDF for this ADR):
 - Third-party notices: BSD-3 for the x3270 glyph data; BSD-3/OFL for the
   optional font.
 
-## Open question for sign-off
+## Resolved at sign-off
 
-**Which symbols do you mean for Attn and SysReq?** I don't want to guess. The
-candidates in x3270's set are the key (`keyleft` + `keyright`), the
-up/down-shift arrows, and the boxed letters. If you have a picture or a manual
-reference (e.g. GA27-3831, the 3174 OIA description), I'll match it exactly.
+- **Attn and SysReq are keys, not status-line glyphs.** They belong in the
+  keyboard mapping (task 19): both must be reachable from a PC keyboard.
+- **Reference: photos of a real 3278-2 status line** (the owner's photos, not
+  committed). Left to right:
+  - `S`, an underlined/boxed `A` and a **solid block** (x3270's `underA` and
+    `boxsolid` style)
+  - at column 8, **`X -f`**: input inhibited, "minus function" (the function
+    isn't available)
+  - an **up arrow** in the middle (`upshift`, the shift indicator)
+  - at the right, `▭-▭01`, `DOC` and a **down arrow** (`downshift`)
+
+  A colour terminal shows the same `SA▌` in blue.
+
+## Follow-ups this adds
+
+1. A **minus-function** lock state (`X -f`): a key whose function isn't
+   available (x3270 `KL_OIA_MINUS`, e.g. SysReq or Attn when the session can't
+   use it). Add it to `OperatorError`/the OIA model and the status line.
+2. **Shift indicators** (`upshift` / `downshift`), driven by the browser's
+   Shift and Caps Lock state, as a real terminal shows its shift state.
+3. Lay out the status line by the 3174 OIA column positions, matching the
+   photo, so connection symbols sit at columns 0–2 and the input-inhibited
+   area starts at column 8.
