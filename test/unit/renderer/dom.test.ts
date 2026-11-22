@@ -114,17 +114,54 @@ describe('DomRenderer', () => {
     expect(cursor.classList.contains('t3270-blink')).toBe(true);
   });
 
-  it('shows keyboard state, insert mode and cursor position in the status line', async () => {
+  it('draws the status line with x3270 glyphs: boxes, X, clock, insert, cursor', async () => {
     const { renderer, host, term } = await setup();
+    const glyphs = () =>
+      [...renderer.element.querySelectorAll('.t3270-oia [data-glyph]')].map((e) =>
+        e.getAttribute('data-glyph'),
+      );
     const oia = () => renderer.element.querySelector('.t3270-oia')!.textContent;
-    expect(oia()).toContain('X SYSTEM'); // awaiting the first write
+    expect(glyphs()).toEqual(['box4', 'underA', 'boxSolid', 'lock']); // awaiting the first write
+    expect(oia()).toContain('[Field]');
+    host.write(frame('f5c2' + '11c150' + '13'));
+    expect(glyphs()).toEqual(['box4', 'underA', 'boxSolid']);
+    expect(oia()).toContain('002/001');
+    term.press({ type: 'insert' });
+    expect(glyphs()).toContain('insert');
+    term.screen.cursor = 0;
+    term.type('A');
+    term.aid('ENTER');
+    expect(glyphs()).toEqual(['box4', 'underA', 'boxSolid', 'lock', 'clockLeft', 'clockRight']);
+  });
+
+  it('shows the shift indicator on request', async () => {
+    const { renderer } = await setup();
+    renderer.setShift(true);
+    expect(renderer.element.querySelector('[data-glyph="upShift"]')).not.toBeNull();
+    renderer.setShift(true);
+    renderer.setShift(false);
+    expect(renderer.element.querySelector('[data-glyph="upShift"]')).toBeNull();
+  });
+
+  it('describes the status line in words for assistive technology', async () => {
+    const { renderer } = await setup();
+    expect(renderer.element.querySelector('.t3270-oia')!.getAttribute('aria-hidden')).toBe('true');
+    expect(renderer.element.textContent).toContain(
+      'Connected; input inhibited, waiting for the host',
+    );
+  });
+
+  it('can show the status line in words instead of glyphs', async () => {
+    const { renderer, host, term } = await setup({ oiaGlyphs: false });
+    const oia = () => renderer.element.querySelector('.t3270-oia')!.textContent;
+    expect(oia()).toContain('X SYSTEM');
     host.write(frame('f5c2' + '11c150' + '13'));
     expect(oia()).not.toContain('X ');
-    expect(oia()).toContain('002/001'); // 1-origin row/col, as x3270 shows it
+    expect(oia()).toContain('002/001');
     term.press({ type: 'insert' });
     expect(oia()).toContain('^');
     term.screen.cursor = 0;
-    term.type('A'); // unformatted screen: fine
+    term.type('A');
     term.aid('ENTER');
     expect(oia()).toContain('X Wait');
   });

@@ -18,6 +18,8 @@ export interface RendererOptions {
   displayMode?: DisplayMode;
   cursorStyle?: 'block' | 'underline';
   cursorBlink?: boolean;
+  /** Draw the status line with x3270's 3270 glyphs (default) or in plain words. */
+  oiaGlyphs?: boolean;
 }
 
 export interface Renderer {
@@ -29,6 +31,8 @@ export interface Renderer {
   refresh(): void;
   /** Switch between the colour and monochrome looks, like a 3279's switch. */
   setDisplayMode(mode: DisplayMode): void;
+  /** Show the shift indicator (Shift or Caps Lock is down). Called by the keyboard mapper. */
+  setShift(down: boolean): void;
   /** Size of one character cell, once known. */
   readonly cellMetrics: CellMetrics | undefined;
   /** The element that should receive keyboard focus. */
