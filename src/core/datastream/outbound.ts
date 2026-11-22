@@ -67,10 +67,19 @@ class AbortWrite extends Error {
   }
 }
 
+export interface OutboundOptions {
+  /**
+   * A 3279 (colour) terminal. A 3278 ignores host colours, as the hardware
+   * does and as x3270 does in 3278 mode. Default true.
+   */
+  color?: boolean;
+}
+
 export function processOutbound(
   screen: Screen,
   record: Uint8Array,
   geometry: OutboundGeometry,
+  options: OutboundOptions = {},
 ): OutboundResult {
   const result: OutboundResult = {
     command: undefined,
@@ -101,11 +110,11 @@ export function processOutbound(
         screen.clear();
       }
       if (alt) result.alternate = true;
-      write(screen, record, result);
+      write(screen, record, result, options.color ?? true);
       break;
     }
     case 'W':
-      write(screen, record, result);
+      write(screen, record, result, options.color ?? true);
       break;
     case 'EAU':
       eraseAllUnprotected(screen);
@@ -130,7 +139,17 @@ export function processOutbound(
 }
 
 /** Write, Erase/Write, Erase/Write Alternate: WCC then orders and data. */
-function write(screen: Screen, rec: Uint8Array, result: OutboundResult): void {
+function write(screen: Screen, rec: Uint8Array, result: OutboundResult, color: boolean): void {
+  /**
+   * The value to store for an extended attribute, or undefined to ignore it:
+   * colours on a 3278, and colour values outside X'F0'-X'FF' become default
+   * (x3270 ctlr_add_fg/bg).
+   */
+  const attrValue = (key: string, value: number): number | undefined => {
+    if (key !== 'foreground' && key !== 'background') return value;
+    if (!color) return undefined;
+    return (value & 0xf0) === 0xf0 ? value : 0;
+  };
   if (rec.length < 2) {
     result.errors.push('record too short: missing WCC');
     result.sense = 'commandReject';
@@ -277,7 +296,8 @@ function write(screen: Screen, rec: Uint8Array, result: OutboundResult): void {
             sa = { foreground: 0, background: 0, highlighting: 0, charset: 0, transparency: 0 };
           } else {
             const key = CHAR_ATTRIBUTE_KEYS.get(type);
-            if (key) sa = { ...sa, [key]: value };
+            const v = key && attrValue(key, value);
+            if (key && v !== undefined) sa = { ...sa, [key]: v };
           }
           i += 3;
           lastCmd = true;
@@ -293,7 +313,8 @@ function write(screen: Screen, rec: Uint8Array, result: OutboundResult): void {
             if (type === AttributeType.FIELD_ATTRIBUTE) attribute = value;
             else {
               const key = FIELD_ATTRIBUTE_KEYS.get(type);
-              if (key) ext[key] = value;
+              const v = key && attrValue(key, value);
+              if (key && v !== undefined) ext[key] = v;
             }
           }
           screen.startField(addr, attribute, ext);
@@ -312,7 +333,8 @@ function write(screen: Screen, rec: Uint8Array, result: OutboundResult): void {
               if (type === AttributeType.FIELD_ATTRIBUTE) changes.attribute = value;
               else {
                 const key = FIELD_ATTRIBUTE_KEYS.get(type);
-                if (key) changes[key] = value;
+                const v = key && attrValue(key, value);
+                if (key && v !== undefined) changes[key] = v;
               }
             }
             screen.modifyField(addr, changes);

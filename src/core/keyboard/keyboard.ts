@@ -315,7 +315,8 @@ export class Keyboard {
 
     const count = this.#cellsToFieldEnd(c);
     for (let k = 0; k < count - 1; k++) this.#copyCell((c + k + 1) % size, (c + k) % size);
-    s.writeChar((c + count - 1) % size, EBC.NULL);
+    // The vacated cell keeps its colour and highlighting (x3270 ctlr_add).
+    s.replaceChar((c + count - 1) % size, EBC.NULL);
     if (field) s.setModified(field.start, true);
     return ok();
   }
@@ -337,7 +338,7 @@ export class Keyboard {
         }
         if (allNull) break;
       }
-      if (s.charAt(a) === EBC.NULL) s.writeChar(a, EBC.SPACE);
+      if (s.charAt(a) === EBC.NULL) s.replaceChar(a, EBC.SPACE);
     }
   }
 

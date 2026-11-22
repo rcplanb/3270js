@@ -148,7 +148,7 @@ can run in parallel with it.
     - Query Reply's Reply Modes reply now claims all three.
   - Verify: unit tests against s3270's inbound bytes for the same screens.
 
-- [ ] **6. Colour and highlighting differential**
+- [x] **6. Colour and highlighting differential**
   - Acceptance:
     - The s3270 differential also compares character attributes (`SA(…)` tokens) and
       field extended attributes (`SF(c0=…,41=…,42=…)`).
@@ -156,6 +156,15 @@ can run in parallel with it.
       list, Revedit and the utilities.
     - Any difference found is fixed in the core.
   - Verify: `npm test` differential suite.
+  - Done: the differential compares foreground, background, highlighting and
+    character set on every cell (`SF(...)`, `SA(...)`, `GE(xx)` from s3270's ReadBuffer),
+    and picks s3270's model from the trace (3279 traces as 3279). New
+    `ispf-tour-3279` trace (TK5 sends 1,422 colour SA orders in six colours); all
+    screens and the key script match. Differences found and fixed: a **3278 ignores
+    host colours** and colour values outside X'F0'–X'FF' mean default (x3270
+    `mode3279`, `ctlr_add_fg/bg`); **Delete and blank fill keep the vacated cell's
+    colour and highlighting** (x3270 `ctlr_add`). TK5's ISPF uses SA, not SFE, so SFE
+    colour is covered by unit tests only.
 
 - [ ] **7. Field outlining and transparency**
   - Acceptance:
