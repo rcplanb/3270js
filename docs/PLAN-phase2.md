@@ -175,12 +175,19 @@ can run in parallel with it.
     colour and highlighting** (x3270 `ctlr_add`). TK5's ISPF uses SA, not SFE, so SFE
     colour is covered by unit tests only.
 
-- [ ] **7. Field outlining and transparency**
+- [x] **7. Field outlining and transparency**
   - Acceptance:
     - Both renderers draw field outlining (lines over, under, left and right of fields)
       and honour transparency.
     - The same `cellStyle` data drives both renderers.
   - Verify: unit tests; e2e screenshots of a synthetic screen.
+  - Done: `cellStyle` gains `outline` (over/under along the field, left at its first
+    character, right at its last; GA23-0059 X'C2') and leaves transparent cells'
+    (X'46' F0/F1/F2) background unpainted, as nothing lies behind a character cell
+    without graphics. DOM draws outlines with inset box-shadows (no layout change),
+    canvas with 1px rules, both in the text colour. `scripts/gen-synthetic-traces.mjs`
+    builds a synthetic screen (`test/traces/synthetic/outlining.json`, e2e target
+    `outlining`); screenshot baselines in three browsers × two renderers.
 
 - [x] **8. Models 3, 4 and 5 live**
   - Acceptance:

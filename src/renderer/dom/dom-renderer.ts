@@ -6,7 +6,7 @@
  */
 import type { OiaLockSymbol, OiaState } from '../../core/oia/index.js';
 import type { Terminal } from '../../core/terminal.js';
-import { type DisplayMode, type Run, rowRuns } from '../cell-style.js';
+import { type DisplayMode, type Run, rowRuns, OUTLINE } from '../cell-style.js';
 import type { CellMetrics, Renderer, RendererOptions } from '../renderer.js';
 import { OIA_GLYPHS, OIA_GLYPH_SIZE } from '../oia-glyphs.js';
 import { type OiaCell, oiaCells, oiaDescription } from '../oia-layout.js';
@@ -205,6 +205,16 @@ export class DomRenderer implements Renderer {
       if (bg) span.style.backgroundColor = bg;
     }
     if (s.underscore) span.style.textDecoration = 'underline';
+    if (s.outline) {
+      // Inset shadows draw lines inside the cells without changing their size.
+      const shadows: string[] = [];
+      if (s.outline & OUTLINE.TOP) shadows.push(`inset 0 1px 0 ${fg}`);
+      if (s.outline & OUTLINE.BOTTOM) shadows.push(`inset 0 -1px 0 ${fg}`);
+      if (s.outline & OUTLINE.LEFT) shadows.push(`inset 1px 0 0 ${fg}`);
+      if (s.outline & OUTLINE.RIGHT) shadows.push(`inset -1px 0 0 ${fg}`);
+      span.style.boxShadow = shadows.join(', ');
+      span.dataset.outline = String(s.outline);
+    }
     if (s.blink) span.classList.add('t3270-blink');
     return span;
   }

@@ -6,7 +6,7 @@
  */
 import type { OiaState } from '../../core/oia/index.js';
 import type { Terminal } from '../../core/terminal.js';
-import { type DisplayMode, rowRuns } from '../cell-style.js';
+import { type DisplayMode, rowRuns, OUTLINE } from '../cell-style.js';
 import { DOM_CSS } from '../dom/styles.js';
 import { OIA_GLYPHS, OIA_GLYPH_SIZE, type OiaGlyph } from '../oia-glyphs.js';
 import { oiaCells, oiaDescription } from '../oia-layout.js';
@@ -247,6 +247,14 @@ export class CanvasRenderer implements Renderer {
         if (cells[i] !== ' ') ctx.fillText(cells[i]!, x + i * this.#cw, y + this.#ch / 2);
       }
       if (s.underscore) ctx.fillRect(x, y + this.#ch - 2, w, 1);
+      if (s.outline) {
+        // Field outlining, in the text colour, on the cell edges.
+        ctx.fillStyle = fg;
+        if (s.outline & OUTLINE.TOP) ctx.fillRect(x, y, w, 1);
+        if (s.outline & OUTLINE.BOTTOM) ctx.fillRect(x, y + this.#ch - 1, w, 1);
+        if (s.outline & OUTLINE.LEFT) ctx.fillRect(x, y, 1, this.#ch);
+        if (s.outline & OUTLINE.RIGHT) ctx.fillRect(x + w - 1, y, 1, this.#ch);
+      }
     }
     if (blinks) this.#blinkRows.add(r);
     else this.#blinkRows.delete(r);

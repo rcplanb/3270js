@@ -1,0 +1,66 @@
+{
+  "format": "3270js-trace",
+  "version": 1,
+  "meta": {
+    "terminalType": "IBM-3279-2-E",
+    "model": 2,
+    "codePage": "cp037",
+    "description": "Synthetic: field outlining and transparency (scripts/gen-synthetic-traces.mjs)"
+  },
+  "events": [
+    {
+      "t": 59,
+      "dir": "host",
+      "kind": "telnet",
+      "hex": "fffd18"
+    },
+    {
+      "t": 60,
+      "dir": "terminal",
+      "kind": "telnet",
+      "hex": "fffb18"
+    },
+    {
+      "t": 167,
+      "dir": "host",
+      "kind": "telnet",
+      "hex": "fffa1801fff0"
+    },
+    {
+      "t": 167,
+      "dir": "terminal",
+      "kind": "telnet",
+      "hex": "fffa180049424d2d333237382d322d45fff0"
+    },
+    {
+      "t": 200,
+      "dir": "host",
+      "kind": "telnet",
+      "hex": "fffb00"
+    },
+    {
+      "t": 200,
+      "dir": "host",
+      "kind": "telnet",
+      "hex": "fffd00"
+    },
+    {
+      "t": 200,
+      "dir": "host",
+      "kind": "telnet",
+      "hex": "fffb19"
+    },
+    {
+      "t": 200,
+      "dir": "host",
+      "kind": "telnet",
+      "hex": "fffd19"
+    },
+    {
+      "t": 0,
+      "dir": "host",
+      "kind": "record",
+      "hex": "f5c311405e1d68c6c9c5d3c440d6e4e3d3c9d5c9d5c71d6011c2e21d60c296a7404d819393408696a4995d11c2f82902c040c20fc2d6e7c5c440c9d5d7e4e311c3c81d6011c5c21d60e4958485999389958511c5d82902c040c201e4d5c4c5d911c5e81d6011c7e21d60d6a58599404e40a49584859911c7f82902c040c205d9e4d3c5c411c8c81d60114ac21d60d38586a3404e4099898788a3114ad82902c040c20ac2d9c1c3d2c5e3c5c4114ae81d60114df21d60d6978198a48540998584408287114ec82902c06045f2c2c1c3d2c7d9d6e4d5c41d601150d21d60e3998195a29781998595a31150e82903c06045f246f0c2c1c3d2c7d9d6e4d5c41d6011c2f913"
+    }
+  ]
+}
