@@ -1,0 +1,10 @@
+{
+  // Core must run unchanged in browsers, Node and Workers: no DOM lib, no
+  // Node types. Anything platform-specific belongs in renderer/ or transport/.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src/core"]
+}
