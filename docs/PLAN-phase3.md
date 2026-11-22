@@ -170,7 +170,7 @@ Each task is one PR.
     - Allowed keys (`DOCENT_AIDS`): Enter, Clear, PA1–3 and PF1–24.
     - Also fixed: `Session.command` at TSO READY pressed Home first, which on an unformatted screen typed at the top; it now types at the cursor.
 
-- [ ] **4. Recordings: asciinema export ("EBCDIC cinema")**
+- [x] **4. Recordings: asciinema export ("EBCDIC cinema")**
   - Acceptance:
     - `traceToCast(trace)` turns a 3270js trace into an asciinema v2 `.cast`:
       - each host write becomes one ANSI full-screen repaint, with SGR colours and the status line as the last row
@@ -182,6 +182,17 @@ Each task is one PR.
     - Casts of the recorded traces play in asciinema-player.
     - `agg` renders them to video.
     - Unit tests compare frames with `Terminal.text`.
+  - Done:
+    - `3270js/cast` is a new entry point. `traceToCast(trace)` replays a trace through a `SessionObserver`:
+      - each host write becomes one ANSI full-screen repaint (true colour, highlighting, the status line as the last row, the cursor)
+      - each operator AID becomes an `"i"` event, redacted (`HERC01 [ENTER]`, `****** [ENTER]`)
+      - the header sizes the screen for the model (132 × 28 for a model 5)
+    - `traceToCommands(trace)` gives each AID with its redacted input, and the recognised screens before and after.
+    - Tests:
+      - a minimal VT interpreter replays every recorded trace's cast frame by frame against the observer's screen, cursor and status line
+      - `agg` renders the colour ISPF menu correctly
+      - SimH Assist's asciinema-player 3.17 plays the whole ISPF tour
+    - The cast is about twice the trace's size (full repaints); repainting only changed rows could halve it later.
 
 - [ ] **5. Faithful replay player**
   - Acceptance:

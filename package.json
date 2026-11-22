@@ -93,6 +93,16 @@
         "default": "./dist/script.cjs"
       }
     },
+    "./cast": {
+      "import": {
+        "types": "./dist/cast.d.ts",
+        "default": "./dist/cast.js"
+      },
+      "require": {
+        "types": "./dist/cast.d.cts",
+        "default": "./dist/cast.cjs"
+      }
+    },
     "./fonts/*": "./fonts/*",
     "./package.json": "./package.json"
   },
