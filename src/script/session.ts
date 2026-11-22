@@ -172,9 +172,9 @@ export class Session {
    * every command while the host holds an invalid one (found on TK5).
    */
   async command(text: string, until?: Until, options: WaitOptions = {}): Promise<void> {
+    // At TSO READY there's no field: type where TSO left the cursor (the next line).
     const field = recognise(this.term).commandField;
     if (field) this.term.moveCursor(field.dataStart);
-    else this.term.press({ type: 'home' });
     this.term.press({ type: 'eraseEof' });
     this.type(text);
     const scroll = fieldAfter(this.term, 'Scroll ===>');
