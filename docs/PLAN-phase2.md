@@ -65,6 +65,13 @@ can run in parallel with it.
     of the connection. Input goes out as 3270-DATA with SEQ-NUMBER counting from 0.
     3270js passes the 5 negotiation and framing interop cases; the other 6 are marked
     pending for tasks 2 and 4.
+  - Checked live (read-only) against **OS/390 2.10's TN3270E server** on the museum's
+    Multiprise 3000: 3270js was assigned LU `SC0TCP01`, agreed BIND-IMAGE, RESPONSES
+    and SYSREQ, and drew the USS screen. OS/390 sends a BIND-IMAGE (PLU `TELNET`,
+    24×80) before the USS screen, which is 3270-DATA with the SNA Erase/Write code
+    `05`. It answers a FUNCTIONS REQUEST naming an unknown function (s3270's
+    CONTENTION-RESOLUTION) with `WONT TN3270E`, not a counter-offer, so s3270 drops to
+    plain TN3270 there; 3270js now handles that impasse too.
 
 - [ ] **2. TN3270E framing and responses**
   - Acceptance:

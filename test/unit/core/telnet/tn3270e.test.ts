@@ -127,6 +127,23 @@ describe('TN3270E negotiation', () => {
     expect(t.tn3270e).toBe(false);
   });
 
+  it('falls back to plain TN3270 when the host ends TN3270E with WONT (as OS/390 2.10 does)', () => {
+    const t = session();
+    t.receive(Uint8Array.of(IAC, DO, TN3270E));
+    t.receive(
+      sb(Op.DEVICE_TYPE, Op.IS, ...ascii('IBM-3278-2-E'), Op.CONNECT, ...ascii('SC0TCP01')),
+    );
+    const r = t.receive(Uint8Array.of(IAC, WONT, TN3270E));
+    expect(sent(r)).toEqual([IAC, WONT, TN3270E]);
+    expect(r).toContainEqual({ type: 'error', message: 'TN3270E ended by the host; using TN3270' });
+    // OS/390 then negotiates plain TN3270, and we reach 3270 mode.
+    t.receive(Uint8Array.of(IAC, DO, TTYPE));
+    t.receive(Uint8Array.of(IAC, SB, TTYPE, 1, IAC, SE));
+    t.receive(Uint8Array.of(IAC, DO, 25, IAC, WILL, 25, IAC, DO, 0, IAC, WILL, 0));
+    expect(t.in3270).toBe(true);
+    expect(t.tn3270e).toBe(false);
+  });
+
   it('leaves TN3270E mode on DONT TN3270E', () => {
     const t = negotiated();
     const r = t.receive(Uint8Array.of(IAC, DONT, TN3270E));

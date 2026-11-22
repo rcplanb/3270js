@@ -96,6 +96,26 @@ describe.each(CLIENTS)('TN3270E interop: $name', (factory) => {
     expect((await client!.text())[0]).toMatch(/^HELLO/);
   });
 
+  it.skipIf(!available)(
+    'falls back to plain TN3270 when the host ends TN3270E with WONT',
+    async () => {
+      // OS/390 2.10 answers a FUNCTIONS REQUEST naming a function it lacks with
+      // WONT TN3270E. A server without SYSREQ makes every client hit that.
+      const s = await session({
+        functions: [Fn.BIND_IMAGE, Fn.RESPONSES],
+        onUnknownFunction: 'wont',
+      });
+      expect(s.events.at(-1)).toMatchObject({
+        kind: 'negotiated',
+        mode: 'tn3270',
+        type: 'IBM-3279-2-E',
+      });
+      s.send3270(HELLO);
+      await settle();
+      expect((await client!.text())[0]).toMatch(/^HELLO/);
+    },
+  );
+
   it.skipIf(!available)('ignores 3270 data until BIND', async () => {
     const s = await session();
     // Erase/Write "GOODBYE WORLD" before BIND, then a plain Write of "HELLO" after it:

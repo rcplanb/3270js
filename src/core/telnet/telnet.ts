@@ -277,6 +277,17 @@ export function createTelnetSession(options: TelnetSessionOptions): TelnetSessio
         }
         break;
       case WONT:
+        // RFC 2355 §7.2.1: a host at an impasse ends TN3270E with WONT (or
+        // DONT). OS/390 2.10 does this when asked for a function it doesn't
+        // know. Drop TN3270E and let plain TN3270 negotiation follow.
+        if (option === TelnetOption.TN3270E && local.has(option)) {
+          eRefused = true;
+          eNegotiated = false;
+          events.push({ type: 'error', message: 'TN3270E ended by the host; using TN3270' });
+          send(IAC, WONT, option);
+          setOption('local', option, false);
+          break;
+        }
         if (remote.has(option)) {
           send(IAC, DONT, option);
           setOption('remote', option, false);
