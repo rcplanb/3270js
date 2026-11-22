@@ -138,5 +138,6 @@ $('trace').onclick = () => {
 const params = new URLSearchParams(location.search);
 if (params.has('model')) $('model').value = params.get('model');
 if (params.has('renderer')) $('renderer').value = params.get('renderer');
+if (params.has('target')) $('target').value = params.get('target');
 if (params.get('color') === '1') $('color').checked = true;
 if (params.has('autoconnect')) void connect();
