@@ -1,0 +1,39 @@
+/**
+ * The contract every renderer implements. A renderer displays a Terminal's
+ * state; it never changes it (keyboard input goes through KeyboardMapper).
+ */
+import type { Terminal } from '../core/terminal.js';
+import type { DisplayMode } from './cell-style.js';
+import type { Theme } from './theme.js';
+
+export interface CellMetrics {
+  /** CSS pixels. */
+  width: number;
+  height: number;
+}
+
+export interface RendererOptions {
+  theme?: Theme;
+  /** Default `color` for 3279 terminals, `monochrome` for 3278s. Can be switched live. */
+  displayMode?: DisplayMode;
+  cursorStyle?: 'block' | 'underline';
+  cursorBlink?: boolean;
+}
+
+export interface Renderer {
+  /** Start displaying a terminal; repaints fully, then follows its events. */
+  attach(terminal: Terminal): void;
+  /** Stop following the terminal (the element stays as it is). */
+  detach(): void;
+  /** Repaint everything, e.g. after a theme or size change. */
+  refresh(): void;
+  /** Switch between the colour and monochrome looks, like a 3279's switch. */
+  setDisplayMode(mode: DisplayMode): void;
+  /** Size of one character cell, once known. */
+  readonly cellMetrics: CellMetrics | undefined;
+  /** The element that should receive keyboard focus. */
+  readonly element: HTMLElement;
+  focus(): void;
+  /** Detach and remove everything the renderer added to the page. */
+  dispose(): void;
+}
