@@ -52,6 +52,7 @@ So 3270js is a complete terminal emulator. Its core is a headless state machine,
 
 - TN3270E negotiation (RFC 2355): DEVICE-TYPE, CONNECT to a named LU, and the FUNCTIONS subnegotiation (BIND-IMAGE, RESPONSES, SYSREQ). Handle the 5-byte header.
 - Query Reply extensions: character and extended-field reply modes (Set Reply Mode), and other Read Partition types.
+- The **minus-function** status (`X -f`, as on Richard's 3278-2 photo). In x3270 it is set when a key's function isn't available in the current session state, such as Attn on an unbound TN3270E session or most AID keys in SSCP-LU mode. Those states arrive with TN3270E, so the indicator does too. _(Deferred from the ADR 0001 follow-ups, 2026-11-22.)_
 - Extended attributes rendered: 7-colour 3279, highlighting (blink, reverse, underscore), field outlining, and character attribute (SA) overrides.
 - **Colour/monochrome setting** _(requested 2026-11-22)_. `Terminal` option `color: boolean` chooses the terminal family, as the 3278/3279 split does: monochrome announces `IBM-3278-n[-E]`, colour announces `IBM-3279-n[-E]`. Query Reply advertises colour only when it is on. It is fixed for the life of a connection, as on real hardware. Renderers also get a live display switch (`displayMode: 'color' | 'monochrome'`), like the colour/mono switch on some models. With colour on and no extended colour from the host, fields get 3279 base-colour mapping (protected/intensified → blue, red, green, white).
 - Models 3, 4 and 5, and default/alternate screen size switching via EWA.
