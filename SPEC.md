@@ -50,27 +50,48 @@ So 3270js is a complete terminal emulator. Its core is a headless state machine,
 
 ### Phase 2: TN3270E and extended data stream
 
-- TN3270E negotiation (RFC 2355): DEVICE-TYPE, CONNECT to a named LU, and the FUNCTIONS subnegotiation (BIND-IMAGE, RESPONSES, SYSREQ). Handle the 5-byte header.
-- Query Reply extensions: character and extended-field reply modes (Set Reply Mode), and other Read Partition types.
+_Already delivered during Phase 1:_ Query Reply (Read Partition Query and Query List), the colour/monochrome setting (`color` and the renderers' live `displayMode`, with 3279 base colours), rendering of extended colour and highlighting, and EWA switching for models 3–5. What remains:
+
+- **TN3270E** (RFC 2355):
+  - DEVICE-TYPE negotiation, including CONNECT to a named LU and falling back to TN3270 when refused
+  - FUNCTIONS negotiation (BIND-IMAGE, RESPONSES, SYSREQ)
+  - the 5-byte header and sequence numbers
+  - positive and negative responses
+  - BIND/UNBIND and the SSCP-LU and LU-LU session states, shown in the status line (underlined B, the LU name)
+- **Attn and SysReq as TN3270E functions.**
 - The **minus-function** status (`X -f`, as on Richard's 3278-2 photo). In x3270 it is set when a key's function isn't available in the current session state, such as Attn on an unbound TN3270E session or most AID keys in SSCP-LU mode. Those states arrive with TN3270E, so the indicator does too. _(Deferred from the ADR 0001 follow-ups, 2026-11-22.)_
-- Extended attributes rendered: 7-colour 3279, highlighting (blink, reverse, underscore), field outlining, and character attribute (SA) overrides.
-- **Colour/monochrome setting** _(requested 2026-11-22)_. `Terminal` option `color: boolean` chooses the terminal family, as the 3278/3279 split does: monochrome announces `IBM-3278-n[-E]`, colour announces `IBM-3279-n[-E]`. Query Reply advertises colour only when it is on. It is fixed for the life of a connection, as on real hardware. Renderers also get a live display switch (`displayMode: 'color' | 'monochrome'`), like the colour/mono switch on some models. With colour on and no extended colour from the host, fields get 3279 base-colour mapping (protected/intensified → blue, red, green, white).
-- Models 3, 4 and 5, and default/alternate screen size switching via EWA.
-- More code pages: 1047, 500, 285 and 1140.
+- **Reply modes:** Set Reply Mode, with the extended-field and character modes (SA orders in inbound data), and the other Read Partition types (RB, RM, RMA).
+- **Colour and highlighting verified:** extend the s3270 differential to character and extended field attributes, on recorded 3279 sessions. Render field outlining and transparency.
+- **Models 3, 4 and 5 verified live** (EWA to 32×80, 43×80 and 27×132 on TK5), with recorded traces.
+- **More code pages:** 1047, 500, 285 and 1140 (with the euro), using the existing generator.
+- **APL:** draw GE and APL-set characters as their real APL glyphs.
+- **The optional 3270 font** (ADR 0001): `3270js/fonts/3270-Regular.woff` plus `@font-face` CSS and its licence notice.
 
 ### Phase 3: Embedding and integration features
 
-These are needed by SimH Assist but generic in design.
+_Already delivered during Phase 1:_ `onKeyboardUnlock` and `onScreenSettled`, programmatic input (`press`, `type`, `fillField`, `aid`, `moveCursor`), session traces with password redaction and replay, and `toText` with non-display fields blanked. What remains, mostly for SimH Assist:
 
-- **Screen-state events:** `onKeyboardUnlock` and `onScreenSettled`, used for "prompt" detection.
-- **Programmatic input:** fill a field by index or position, then press an AID.
-- **Redaction hooks:** expose non-display (hidden) fields so a consumer can keep them out of logs.
-- **Snapshot and replay:** record host records with timestamps, play back, and serialise the screen to JSON or text.
-- **Remote view:** a headless core in Node mirrors its state to a thin browser renderer (see Open Question 1).
+- **Observer mode:** a passive server-side copy that follows both directions of a session (decided at Open Question 1), built on `parseInbound` and the trace recorder's shadow screen.
+- **SimH Assist integration:** prompt detection from screen state, Docent field injection, password-safe session logging and replay.
+- **A public scripting helper**, for example `waitFor(text)` and `then type`. It should include the recovery patterns the live tests learned: RECONNECT, PA2 to reshow, Clear, `CANCEL`, and TSO `***` paging.
+
+### Phase 4: Graphics (GDDM) — far future _(logged 2026-11-22)_
+
+The museum wants to show that these terminals were not text-only. GDDM drove three kinds of graphics on 3270-family displays, and each would get its own Query Replies and structured fields:
+
+- **Programmed symbols:** host-loadable character sets, as on the 3279-S3G. Character-cell graphics, charts and custom fonts.
+- **Vector graphics:** the graphics terminals (3179G, 3192G), which took drawing orders (lines, arcs, areas, text) in structured fields.
+- **Image (bitmap) display.**
+
+Notes for when it starts:
+
+- **Rendering:** the canvas renderer is the natural basis. The DOM renderer would overlay a canvas.
+- **Documentation:** gather IBM's data-stream manuals for programmed symbols, graphics and image, and record them in an ADR before any design.
+- **A host with GDDM is a hard prerequisite.** MVS 3.8/TK5 has none. Candidates are a licensed OS/390 or VM system (for example the museum's Multiprise 3000), or recorded traces from one.
 
 ### Out of scope (for now)
 
-IND$FILE file transfer, printer sessions (LU1/LU3/SCS), DBCS, graphics (GDDM / Programmed Symbols), light pen, and the SimH Assist rename.
+IND$FILE file transfer, printer sessions (LU1/LU3/SCS), DBCS, light pen, and the SimH Assist rename. Graphics have moved to Phase 4.
 
 ## 3. Architecture
 
