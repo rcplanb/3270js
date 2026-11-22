@@ -28,6 +28,20 @@ for (const renderer of ['dom', 'canvas'] as const) {
       expect(errors).toEqual([]);
     });
   });
+
+  test.describe(`${renderer} renderer, model 5`, () => {
+    test('shows ISPF at 27x132 after Erase/Write Alternate', async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await page.goto(`/?target=replay-model5&model=5&renderer=${renderer}&color=1&autoconnect`);
+      await logonToIspf(page, 'HERC03', 'NOTUSED');
+      const rows = (await screenText(page)).split('\n');
+      expect(rows).toHaveLength(27);
+      expect(rows[0]).toHaveLength(132);
+      await expect(page.locator('#terminal')).toHaveScreenshot(`ispf-menu-model5-${renderer}.png`);
+      expect(errors).toEqual([]);
+    });
+  });
 }
 
 test('typed text appears on the screen in the browser', async ({ page }) => {

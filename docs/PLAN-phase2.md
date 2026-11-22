@@ -173,12 +173,18 @@ can run in parallel with it.
     - The same `cellStyle` data drives both renderers.
   - Verify: unit tests; e2e screenshots of a synthetic screen.
 
-- [ ] **8. Models 3, 4 and 5 live**
+- [x] **8. Models 3, 4 and 5 live**
   - Acceptance:
     - On TK5 as HERC03, models 3, 4 and 5 log on and show ISPF at the alternate size
       via EWA.
     - Record traces, run the differential, and take e2e screenshots at 132 columns.
   - Verify: live run, differential, e2e.
+  - Done: TK5's VTAM and ISPF use the alternate size for models 3, 4 and 5 (17 EWAs in
+    each tour). Colour traces `ispf-tour-3279-{3,4,5}` recorded as HERC03
+    (`LIVE_MODEL`, `LIVE_COLOR`); the differential runs s3270 as the trace's model and
+    matches every screen, plus the key script on two 27×132 screens. e2e: the model 5
+    replay (`replay-model5` target) shows ISPF at 27×132 in all three browsers, DOM and
+    canvas, with screenshot baselines.
 
 ### Presentation (→ Checkpoint G)
 
