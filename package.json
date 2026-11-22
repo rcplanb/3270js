@@ -95,7 +95,8 @@
     "check:exports": "npm run build && node scripts/check-exports.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run check:traces",
     "test:live": "vitest run --config vitest.live.config.ts",
-    "check:traces": "node scripts/check-traces.mjs"
+    "check:traces": "node scripts/check-traces.mjs",
+    "dev": "tsup && node scripts/dev.mjs"
   },
   "peerDependencies": {
     "ws": "^8.0.0"
@@ -107,6 +108,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^22",
     "@types/ws": "^8.18.2",
     "@vitest/coverage-v8": "^5.1.1",

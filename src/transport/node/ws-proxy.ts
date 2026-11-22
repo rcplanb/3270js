@@ -32,7 +32,8 @@ export interface ProxySession {
   target: string;
   /** Called with every chunk in each direction. */
   onTraffic(listener: (direction: 'host' | 'terminal', data: Uint8Array) => void): void;
-  onEnd(listener: () => void): void;
+  /** Called once when the session ends, with the reason. */
+  onEnd(listener: (reason: string) => void): void;
 }
 
 export interface WebSocketProxy {
@@ -94,7 +95,7 @@ function bridge(
   onSession: WebSocketProxyOptions['onSession'],
 ): void {
   const traffic = new Set<(d: 'host' | 'terminal', data: Uint8Array) => void>();
-  const ends = new Set<() => void>();
+  const ends = new Set<(reason: string) => void>();
   onSession?.({
     target: name,
     onTraffic: (l) => traffic.add(l),
@@ -109,7 +110,7 @@ function bridge(
     ended = true;
     tcp.destroy();
     if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close(1000, reason);
-    for (const l of ends) l();
+    for (const l of ends) l(reason);
   };
 
   tcp.on('data', (buf: Buffer) => {
@@ -118,7 +119,7 @@ function bridge(
     ws.send(bytes);
   });
   tcp.on('close', () => end('host closed the connection'));
-  tcp.on('error', () => end('host connection failed'));
+  tcp.on('error', (err) => end(`host connection failed: ${err.message}`));
 
   ws.on('message', (data: Buffer, isBinary: boolean) => {
     if (!isBinary) return;
@@ -127,5 +128,5 @@ function bridge(
     tcp.write(bytes);
   });
   ws.on('close', () => end('client closed'));
-  ws.on('error', () => end('client error'));
+  ws.on('error', (err) => end(`client error: ${err.message}`));
 }

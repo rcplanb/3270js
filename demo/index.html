@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3270js demo</title>
+    <link rel="stylesheet" href="demo.css" />
+  </head>
+  <body>
+    <header>
+      <h1>3270js</h1>
+      <span class="sub">TN3270 terminal emulator — demo</span>
+    </header>
+    <section class="controls" aria-label="Session">
+      <label
+        >Host
+        <select id="target"></select
+      ></label>
+      <label
+        >Model
+        <select id="model">
+          <option value="2" selected>2 (24×80)</option>
+          <option value="3">3 (32×80)</option>
+          <option value="4">4 (43×80)</option>
+          <option value="5">5 (27×132)</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="color" /> 3279 colour terminal</label>
+      <button id="connect" type="button">Connect</button>
+      <span class="sep"></span>
+      <label
+        >Display
+        <select id="display">
+          <option value="monochrome">Monochrome</option>
+          <option value="color">Colour</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="glyphs" checked /> 3270 status glyphs</label>
+      <label><input type="checkbox" id="blankfill" checked /> Insert into trailing blanks</label>
+      <button id="trace" type="button" disabled>Download trace</button>
+    </section>
+    <main>
+      <div id="terminal"></div>
+      <aside class="keys" aria-label="Keyboard">
+        <h2>Keys</h2>
+        <table>
+          <tbody id="keys"></tbody>
+        </table>
+        <p class="note">Click to move the cursor. Passwords are redacted from downloaded traces.</p>
+      </aside>
+    </main>
+    <p id="status" role="status"></p>
+    <script type="module" src="demo.js"></script>
+  </body>
+</html>
