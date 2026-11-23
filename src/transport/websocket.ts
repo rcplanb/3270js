@@ -2,6 +2,10 @@
  * WebSocketTransport: carries the telnet byte stream over a WebSocket, as
  * binary messages. Works in browsers and in Node 22+ (global WebSocket).
  * The server end is typically createWebSocketProxy() from `3270js/node`.
+ *
+ * Text messages are not part of the byte stream. An embedding server can use
+ * them on the same socket for its own control messages: read them with
+ * onText() and send them with sendText(). The Terminal never sees them.
  */
 import type { Transport } from '../core/transport.js';
 
@@ -12,8 +16,10 @@ export interface WebSocketTransportOptions {
 export class WebSocketTransport implements Transport {
   readonly #ws: WebSocket;
   readonly #data = new Set<(d: Uint8Array) => void>();
+  readonly #text = new Set<(t: string) => void>();
   readonly #close = new Set<(reason?: string) => void>();
-  #queue: Uint8Array<ArrayBuffer>[] = [];
+  /** Messages sent before the socket opened, in order: bytes and text. */
+  #queue: (Uint8Array<ArrayBuffer> | string)[] = [];
   #closed = false;
 
   constructor(url: string | URL, options: WebSocketTransportOptions = {}) {
@@ -27,8 +33,9 @@ export class WebSocketTransport implements Transport {
       if (e.data instanceof ArrayBuffer) {
         const bytes = new Uint8Array(e.data);
         for (const l of this.#data) l(bytes);
+      } else if (typeof e.data === 'string') {
+        for (const l of this.#text) l(e.data);
       }
-      // Text messages are not part of the protocol; ignore them.
     });
     this.#ws.addEventListener('close', (e: CloseEvent) =>
       this.#finish(e.reason || `code ${e.code}`),
@@ -42,6 +49,19 @@ export class WebSocketTransport implements Transport {
     const copy = new Uint8Array(data);
     if (this.#ws.readyState === WebSocket.OPEN) this.#ws.send(copy);
     else this.#queue.push(copy);
+  }
+
+  /** Send a text message (an embedder's control message), queued until the socket opens. */
+  sendText(text: string): void {
+    if (this.#closed) return;
+    if (this.#ws.readyState === WebSocket.OPEN) this.#ws.send(text);
+    else this.#queue.push(text);
+  }
+
+  /** Text messages from the server. Returns an unsubscribe function. */
+  onText(listener: (text: string) => void): () => void {
+    this.#text.add(listener);
+    return () => this.#text.delete(listener);
   }
 
   onData(listener: (data: Uint8Array) => void): () => void {
