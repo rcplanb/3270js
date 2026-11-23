@@ -5,9 +5,12 @@ TypeScript, an [xterm.js](https://xtermjs.org/) analogue for IBM mainframes.
 
 ![ISPF on MVS 3.8j TK5 in 3270js](docs/screenshots/demo-ispf-color.png)
 
-**Status:** v0.1.0 (2026-11-22): Phases 1 and 2 complete, Phase 3 under way. Not yet published to npm; see Install. See
-[SPEC.md](SPEC.md), [docs/PLAN.md](docs/PLAN.md) (Phase 1) and
-[docs/PLAN-phase2.md](docs/PLAN-phase2.md) (Phase 2).
+**Status:** v0.2.1 (2026-11-23): Phases 1 to 3 complete. 3270js runs IBM
+mainframe sessions in [SimH Assist](https://github.com/rcplanb/simh-assist).
+Not yet published to npm; see Install. See [SPEC.md](SPEC.md),
+[docs/PLAN.md](docs/PLAN.md) (Phase 1),
+[docs/PLAN-phase2.md](docs/PLAN-phase2.md) (Phase 2) and
+[docs/PLAN-phase3.md](docs/PLAN-phase3.md) (Phase 3).
 
 - **A complete 3278/3279 terminal, headless.** Telnet negotiation, the 3270
   data stream (every command and order), the field model, the keyboard with
@@ -32,7 +35,15 @@ TypeScript, an [xterm.js](https://xtermjs.org/) analogue for IBM mainframes.
   WebSocket-to-TCP proxy that is never an open relay.
 - **Scriptable.** Drive a mainframe from Node with no browser, as s3270 does.
 - **Session traces.** Record, replay and share sessions, with passwords
-  redacted.
+  redacted. Replay them in a real terminal (`TracePlayer`), or export them
+  to asciinema and from there to MP4: what the operator typed is shown as
+  the terminal showed it.
+- **A server-side view of a session.** `SessionObserver` keeps a passive
+  copy of a session that a relay passes through: the screen as the host
+  knows it, hidden fields known and redacted, and the keyboard lock.
+  `recognise` names the screen (VTAM logon, password, `***`, ISPF, TSO
+  `READY`), and `parseAction`/`applyAction` let an assistant fill fields and
+  press keys, never into a password field and never Attn or SysReq.
 
 ## Try it
 
@@ -53,8 +64,8 @@ HERCULES_HOST=<host> npm run dev      # then open http://localhost:5270
 your project and depend on it.
 
 ```sh
-mkdir -p vendor && cp 3270js-0.1.0.tgz vendor/
-npm install ./vendor/3270js-0.1.0.tgz   # "3270js": "file:vendor/3270js-0.1.0.tgz"
+mkdir -p vendor && cp 3270js-0.2.1.tgz vendor/
+npm install ./vendor/3270js-0.2.1.tgz   # "3270js": "file:vendor/3270js-0.2.1.tgz"
 npm install ws@8                         # needed by 3270js/node
 ```
 
@@ -197,12 +208,34 @@ checked against s3270:
 - **A canvas doesn't load web fonts.** The canvas renderer has to ask for its font
   and re-measure, or it draws the 3270 font in the fallback font's cells.
 
+## What Phase 3 taught us
+
+Found while putting TK5 sessions into SimH Assist:
+
+- **Never leave a TSO logon at the password prompt.** MVS keeps the user ID
+  (`D TS,L` lists it) and `C U=` doesn't clear it. VTAM `V NET,INACT,ID=CUU0Cn,I`
+  and then `ACT` does, and the terminal needs Clear to see the logon screen again.
+- **Any word plus Enter at TK5's `Logon ===>` starts a TSO logon.** Tests that
+  don't mean to log on type, then Erase Input and Clear.
+- **TSO line mode puts `READY` in an unprotected field**, so recognising READY
+  has to ignore only what is being typed in the cursor's field, not every input
+  field.
+- **Read Modified drops nulls.** Text typed on the line below `READY` arrives as
+  if typed at the start of the field. Replays put it just before the cursor,
+  where the operator typed it.
+- **Enter at a password prompt submits a password**, even if
+  something else was filled in. An assistant must not act there at all, and
+  failed attempts can revoke the ID.
+
 ## Roadmap
 
-- **Phase 3:**
-  - SimH Assist integration: a passive server-side copy of the session, the
-    Docent filling in fields, password-safe logging, session replay
-  - a public scripting helper, for example "wait for this text, then type"
+- **Phase 3 (done):** SimH Assist integration: a passive server-side copy
+  of the session, the Docent filling in fields, password-safe recording,
+  and replay in both players and as MP4.
+- **Next** ([docs/PLAN-phase3.md](docs/PLAN-phase3.md)): OS/390 ADCD under
+  Hercules; a pool of TSO user IDs with a Logon button and clean endings;
+  recordings as a feature of their own (rendering from the command line,
+  captions and chapters, scripted demos, an embeddable replay page).
 - **Phase 4 (far future): graphics (GDDM).** Programmed symbols, vector
   graphics and image display; needs a host with GDDM.
 - **Phase 5 (far future): file transfer (IND$FILE).** DFT and CUT modes.
