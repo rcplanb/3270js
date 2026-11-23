@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 (2026-11-23)
+
+- `WebSocketTransport` passes text messages to the embedder: `onText()` and
+  `sendText()`, so a server can send control messages on the terminal's own
+  socket. Text and bytes sent before the socket opens keep their order.
+  Before, text messages were dropped.
+
 ## 0.1.0 (2026-11-22)
 
 First release, for SimH Assist. Distributed as a tarball on a GitHub release

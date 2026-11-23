@@ -91,6 +91,11 @@ term.type('HERC03');
 term.aid('ENTER');
 ```
 
+An embedding server can share the terminal's WebSocket for its own control
+messages: binary messages carry the 3270 session, and text messages are left
+to you, with `transport.onText(listener)` and `transport.sendText(text)`. The
+terminal never sees them.
+
 Options include `luName` (ask for a specific LU, such as a console),
 `codePage` (`cp037`, `cp1047`, `cp500`, `cp285`, `cp1140`) and `tn3270e`
 (on by default; hosts that don't offer it get plain TN3270).

@@ -201,3 +201,63 @@ describe('WebSocket proxy + WebSocketTransport', () => {
     await expect(createWebSocketProxy({ targets: {} })).rejects.toThrow(/no targets/);
   });
 });
+
+describe('WebSocketTransport text messages', () => {
+  /** A server that sends `script` on connection and records what it receives, in order. */
+  async function server(script: (string | Buffer)[]) {
+    const { WebSocketServer } = await import('ws');
+    const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await new Promise<void>((r) => wss.once('listening', () => r()));
+    cleanups.push(() => new Promise<void>((r) => wss.close(() => r())));
+    const received: string[] = [];
+    wss.on('connection', (sock) => {
+      sock.on('message', (data, isBinary) => {
+        const buf = Buffer.from(data as Buffer);
+        received.push(isBinary ? `bin:${buf.toString('hex')}` : `text:${buf.toString()}`);
+      });
+      for (const m of script) sock.send(m, { binary: typeof m !== 'string' });
+    });
+    return { url: `ws://127.0.0.1:${(wss.address() as { port: number }).port}`, received };
+  }
+
+  it('delivers text to onText and bytes to onData, separately', async () => {
+    const srv = await server(['{"type":"connected"}', Buffer.from([1, 2, 3]), '{"type":"exit"}']);
+    const t = new WebSocketTransport(srv.url);
+    cleanups.push(() => t.close());
+    const texts: string[] = [];
+    const bytes: number[][] = [];
+    t.onText((s) => texts.push(s));
+    t.onData((d) => bytes.push([...d]));
+    await until(() => texts.length === 2);
+    expect(texts).toEqual(['{"type":"connected"}', '{"type":"exit"}']);
+    expect(bytes).toEqual([[1, 2, 3]]);
+  });
+
+  it('sends text and bytes in order, including those queued before the socket opened', async () => {
+    const srv = await server([]);
+    const t = new WebSocketTransport(srv.url);
+    cleanups.push(() => t.close());
+    t.sendText('first');
+    t.send(Uint8Array.of(0xff, 0xfb));
+    t.sendText('second');
+    await until(() => srv.received.length === 3);
+    t.sendText('after open');
+    await until(() => srv.received.length === 4);
+    expect(srv.received).toEqual(['text:first', 'bin:fffb', 'text:second', 'text:after open']);
+  });
+
+  it('stops delivering text after unsubscribing, and sends nothing once closed', async () => {
+    const srv = await server(['a']);
+    const t = new WebSocketTransport(srv.url);
+    const texts: string[] = [];
+    const off = t.onText((s) => texts.push(s));
+    off();
+    t.onData(() => undefined);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(texts).toEqual([]);
+    t.close();
+    t.sendText('late');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(srv.received).toEqual([]);
+  });
+});
