@@ -1,6 +1,6 @@
 # Phase 3 Implementation Plan
 
-> Status: **decisions recorded, for review** · 2026-11-22 · Implements [SPEC.md](../SPEC.md) §2 Phase 3
+> Status: **Phase 3 accepted** (tasks 1–12) · 2026-11-23; tasks 13–18 follow · Implements [SPEC.md](../SPEC.md) §2 Phase 3
 
 ## Goal
 
@@ -269,7 +269,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     - A recorded TK5 session replays in both players and exports to MP4.
     - **The password appears in none of the outputs.**
 
-- [ ] **12. Phase 3 acceptance**
+- [x] **12. Phase 3 acceptance**
   - Acceptance, live on TK5 through SimH Assist:
     1. A visitor logs on.
     2. The Docent recognises the ISPF menu, proposes a command and injects it after "Run".
@@ -277,6 +277,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     4. The recording, cast, MP4 and `session_commands` contain no password.
   - Also: README and docs in both repos.
   - Verify: the live run, then a museum demo checklist.
+  - Done 2026-11-23: all four checked live on TK5 (Docent test instance with the preview `mvs_s370` agent, rcplanb/virtual-docent#8). Docs and `docs/museum-demo-3270.md` in rcplanb/simh-assist#44.
 
 ### After Phase 3 acceptance
 
