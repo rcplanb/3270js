@@ -239,7 +239,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     - A JSON control channel for Docent actions and state.
   - Verify: an integration test with 3270js's scripted test host; live on TK5.
 
-- [ ] **9. The browser page** (simh-assist #40, in review)
+- [x] **9. The browser page** (simh-assist #40)
   - Acceptance:
     - `index.html` chooses the renderer by the machine's terminal type: xterm for the existing machines, and 3270js (DOM renderer, keyboard mapper, 3270 font, status line) for `tn3270`.
     - 3270js served from `node_modules` like xterm.
@@ -247,7 +247,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     - `window.simhAssist` works for 3270 too: `getTerminalOutput` returns the screen text.
   - Verify: SimH Assist's CI checks, and a manual visit through the dashboard.
 
-- [ ] **10. Docent bridge for 3270**
+- [x] **10. Docent bridge for 3270** (simh-assist #41)
   - Acceptance:
     - `/terminal/state` returns:
       - the screen text
@@ -259,7 +259,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     - It's refused when not ready, or when the target field is hidden.
   - Verify: `node --test` with a stubbed observer; live with the Docent service.
 
-- [ ] **11. Logging and replay**
+- [x] **11. Logging and replay** (simh-assist #42; typed input in replays: 3270js #60, v0.2.0)
   - Acceptance:
     - A 3270 session writes its redacted 3270js trace, plus a derived `.cast` for asciinema-player and MP4 export.
     - Its command/response pairs go to `session_commands`.
@@ -290,6 +290,15 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     - **3270js:** a way for the server to act from its observer (fill a field, press an AID) once it is in charge: logon, cleanup, and Docent actions with no browser. A minor release.
   - Verify: unit tests for the pool and its leases; live on TK5, closing the page at each stage (logon screen, password prompt, `READY`, ISPF) leaves no TSO user (`D TS,L`) and returns the ID to the pool.
   - Open: which IDs go into TK5's pool (HERC01 and HERC02 are the user's own), and whether to create more.
+
+### Recordings as a feature (after Phase 3)
+
+No other TN3270 client we know of renders a session to its own faithful player, to asciinema or to MP4. The user sees this as a first-class feature, beyond SimH Assist: **training videos and demonstrations**. Candidate tasks, roughly in order of effort:
+
+- [ ] **15. Render from the command line.** A `3270js` command that takes a trace (or runs a script against a host) and writes a `.cast` or an MP4, so videos can be made without SimH Assist.
+- [ ] **16. Captions and chapters.** Each key is already known (`LOGON HERC03`, `[PF3]`) and so is each screen (ISPF panel titles): caption every step, and add chapter marks ("ISPF primary menu", "Data set list") to casts, MP4s and the player.
+- [ ] **17. Scripted, repeatable demos.** Drive a session with `3270js/script` with set timing, so a demo can be re-recorded identically after a system change.
+- [ ] **18. An embeddable replay page.** A trace is small (about 20 KB for a logon, ISPF, `TIME`, logoff session); embed the player in a web page as asciinema's is, with real 3270 rendering.
 
 ### Infrastructure (in parallel)
 
