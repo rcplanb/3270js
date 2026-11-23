@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Terminal } from '../../../src/core/terminal.js';
 import {
   ScriptError,
@@ -60,3 +60,35 @@ describe('Session, on the recorded ISPF tour', () => {
 });
 
 void toIspfPrimary;
+
+describe('tsoLogoff at a password prompt', () => {
+  it('cancels the logon: PA1, then LOGOFF at the LOGON prompt', async () => {
+    const { FakeHost, HERCULES_NEGOTIATION, frame } = await import('../../helpers/fake-host.js');
+    const { cp037 } = await import('../../../src/core/codepage/index.js');
+    const host = new FakeHost();
+    const term = new Terminal({ model: 2 });
+    const connected = term.connect(host);
+    for (const n of HERCULES_NEGOTIATION) host.write(n);
+    await connected;
+    const hex = (b: Uint8Array) => Buffer.from(b).toString('hex');
+    const text = (t: string) => hex(cp037.encode(t));
+    // EW, WCC restore; the prompt; a hidden unprotected field with the cursor in it.
+    host.write(frame(`f5c3114040${text('ENTER CURRENT PASSWORD FOR MUSE01-')}1d4c13`));
+    host.takeSent();
+    const s = new Session(term, { quietMs: 20, timeoutMs: 2_000 });
+    expect(s.state.kind).toBe('password');
+
+    const done = tsoLogoff(s);
+    await vi.waitFor(() => expect(host.sent.length).toBeGreaterThan(0));
+    expect(host.takeSent()).toBe(frame('6c')); // PA1, nothing typed
+    // TSO asks for a LOGON command again, with the cursor on the next line.
+    host.write(frame(`f5c3114040${text(' LOGON')}11c15013`));
+    await vi.waitFor(() => expect(host.sent.length).toBeGreaterThan(0));
+    const sent = host.takeSent();
+    expect(sent.startsWith('7d')).toBe(true); // Enter
+    expect(sent).toContain(text('LOGOFF'));
+    host.write(frame(`f5c3114040${text('Logon ===>')}1d4013`));
+    await done;
+    expect(s.state.kind).toBe('vtam-logon');
+  });
+});

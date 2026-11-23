@@ -5,7 +5,7 @@ TypeScript, an [xterm.js](https://xtermjs.org/) analogue for IBM mainframes.
 
 ![ISPF on MVS 3.8j TK5 in 3270js](docs/screenshots/demo-ispf-color.png)
 
-**Status:** v0.2.1 (2026-11-23): Phases 1 to 3 complete. 3270js runs IBM
+**Status:** v0.3.0 (2026-11-24): Phases 1 to 3 complete. 3270js runs IBM
 mainframe sessions in [SimH Assist](https://github.com/rcplanb/simh-assist).
 Not yet published to npm; see Install. See [SPEC.md](SPEC.md),
 [docs/PLAN.md](docs/PLAN.md) (Phase 1),
@@ -44,6 +44,8 @@ Not yet published to npm; see Install. See [SPEC.md](SPEC.md),
   `recognise` names the screen (VTAM logon, password, `***`, ISPF, TSO
   `READY`), and `parseAction`/`applyAction` let an assistant fill fields and
   press keys, never into a password field and never Attn or SysReq.
+  `Terminal.adopt` lets the server take the session over on the same
+  connection, for example to log off a visitor who closed the page.
 
 ## Try it
 
@@ -64,8 +66,8 @@ HERCULES_HOST=<host> npm run dev      # then open http://localhost:5270
 your project and depend on it.
 
 ```sh
-mkdir -p vendor && cp 3270js-0.2.1.tgz vendor/
-npm install ./vendor/3270js-0.2.1.tgz   # "3270js": "file:vendor/3270js-0.2.1.tgz"
+mkdir -p vendor && cp 3270js-0.3.0.tgz vendor/
+npm install ./vendor/3270js-0.3.0.tgz   # "3270js": "file:vendor/3270js-0.3.0.tgz"
 npm install ws@8                         # needed by 3270js/node
 ```
 

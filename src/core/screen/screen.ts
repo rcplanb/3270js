@@ -130,6 +130,29 @@ export class Screen {
     this.#version++;
   }
 
+  /**
+   * Make this screen an exact copy of `other`: size, every cell and its
+   * attributes, the fields and the cursor. Used to continue a session from a
+   * copy kept elsewhere (Terminal.adopt).
+   */
+  copyFrom(other: Screen): void {
+    if (other.#rows !== this.#rows || other.#cols !== this.#cols)
+      this.resize(other.#rows, other.#cols);
+    this.#chars.set(other.#chars);
+    this.#isFa.set(other.#isFa);
+    this.#fa.set(other.#fa);
+    this.#fg.set(other.#fg);
+    this.#bg.set(other.#bg);
+    this.#hl.set(other.#hl);
+    this.#cs.set(other.#cs);
+    this.#tr.set(other.#tr);
+    this.#validation.set(other.#validation);
+    this.#outlining.set(other.#outlining);
+    this.#cursor = other.#cursor;
+    this.#fieldsChanged();
+    this.#version++;
+  }
+
   /** Erase every cell to null with default attributes and home the cursor. */
   clear(): void {
     for (const a of [

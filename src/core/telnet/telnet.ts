@@ -102,6 +102,12 @@ export interface TelnetSessionOptions {
    * SEND means the host refused it.
    */
   luName?: string;
+  /**
+   * Start already in 3270 mode, continuing a session negotiated by someone
+   * else on this connection (Terminal.adopt). Without `tn3270e`, plain
+   * TN3270: BINARY and EOR both ways, TERMINAL-TYPE sent.
+   */
+  resume?: { tn3270e?: { deviceType: string; luName?: string; functions: number[] } };
 }
 
 export interface TelnetSession {
@@ -131,6 +137,34 @@ const enum State {
   Verb,
   Sb,
   SbIac,
+}
+
+/**
+ * Frame a 3270 record for the wire: an optional TN3270E header, the data with
+ * IAC doubled, then IAC EOR.
+ */
+export function frameRecord(body: Uint8Array, header?: Tn3270eHeader): Uint8Array {
+  const data = header
+    ? Uint8Array.of(
+        header.dataType,
+        header.requestFlag,
+        header.responseFlag,
+        (header.seq >> 8) & 0xff,
+        header.seq & 0xff,
+        ...body,
+      )
+    : body;
+  let iacs = 0;
+  for (const b of data) if (b === IAC) iacs++;
+  const out = new Uint8Array(data.length + iacs + 2);
+  let i = 0;
+  for (const b of data) {
+    out[i++] = b;
+    if (b === IAC) out[i++] = IAC;
+  }
+  out[i++] = IAC;
+  out[i] = EOR;
+  return out;
 }
 
 export function createTelnetSession(options: TelnetSessionOptions): TelnetSession {
@@ -179,6 +213,27 @@ export function createTelnetSession(options: TelnetSessionOptions): TelnetSessio
   let recordOverflow = false;
   let nvt: number[] = [];
   let events: TelnetEvent[] = [];
+
+  const resume = options.resume;
+  if (resume) {
+    ttypeSent = true;
+    in3270 = true;
+    if (resume.tn3270e) {
+      local.add(TelnetOption.TN3270E);
+      remote.add(TelnetOption.TN3270E);
+      eRefused = false;
+      eNegotiated = true;
+      eFunctions = new Set(resume.tn3270e.functions);
+      eDeviceType = resume.tn3270e.deviceType;
+      eLuName = resume.tn3270e.luName;
+    } else {
+      for (const o of [TelnetOption.BINARY, TelnetOption.EOR]) {
+        local.add(o);
+        remote.add(o);
+      }
+      local.add(TelnetOption.TTYPE);
+    }
+  }
 
   const send = (...bytes: number[]) => events.push({ type: 'send', data: Uint8Array.from(bytes) });
 
@@ -471,30 +526,6 @@ export function createTelnetSession(options: TelnetSessionOptions): TelnetSessio
     }
     flushNvt();
     return events;
-  };
-
-  const frameRecord = (body: Uint8Array, header?: Tn3270eHeader): Uint8Array => {
-    const data = header
-      ? Uint8Array.of(
-          header.dataType,
-          header.requestFlag,
-          header.responseFlag,
-          (header.seq >> 8) & 0xff,
-          header.seq & 0xff,
-          ...body,
-        )
-      : body;
-    let iacs = 0;
-    for (const b of data) if (b === IAC) iacs++;
-    const out = new Uint8Array(data.length + iacs + 2);
-    let i = 0;
-    for (const b of data) {
-      out[i++] = b;
-      if (b === IAC) out[i++] = IAC;
-    }
-    out[i++] = IAC;
-    out[i] = EOR;
-    return out;
   };
 
   return {

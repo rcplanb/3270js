@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.3.0 (2026-11-24)
+
+A server can act on a session it observes (Phase 3, task 14a).
+
+- **`Terminal.adopt(observer, transport)`** takes over a session that a
+  `SessionObserver` has been following, on the same connection, without
+  negotiating again. The screen, fields, cursor, keyboard lock, reply mode
+  and TN3270E state (device type, functions, BIND, sequence numbers) carry
+  on, so `Session` and the TSO helpers run unchanged. SimH Assist uses it to
+  log off a session whose visitor closed the page.
+  - Tested at every key of every recorded trace: the adopted terminal shows
+    the same screen, keeps in step with the host, and a key press sends
+    exactly the bytes the real terminal sent.
+  - Checked live on TK5, taking over in ISPF and at a password prompt.
+- **`encodeInbound(input, bufferSize)`** builds a terminal record (AID,
+  cursor, SBA and data per field), the inverse of `parseInbound`.
+- **`frameRecord(body, header?)`** frames a record for the wire, as a
+  standalone function: TN3270E header, IAC doubled, IAC EOR.
+- **`SessionObserver`** follows more of the session:
+  - `session` gives what a takeover needs.
+  - `model` and `color` are exposed.
+  - It follows Set Reply Mode.
+- `Screen.copyFrom(other)`, `Keyboard.resume(waitingForHost)`, and the
+  telnet session's `resume` option.
+- **`tsoLogoff` cancels a logon left at the password prompt.** On TK5, PA1
+  alone doesn't: TSO asks for a LOGON command again. `LOGOFF` there ends the
+  logon, with no password. A connection dropped at that prompt leaves the
+  user ID stuck until VTAM deactivates the terminal.
+
 ## 0.2.1 (2026-11-23)
 
 - **Typed input lands where it was typed.** Read Modified drops a field's

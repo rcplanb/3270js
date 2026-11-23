@@ -82,6 +82,18 @@ export class Keyboard {
     });
   }
 
+  /**
+   * Continue a session someone else started (Terminal.adopt): connected, and
+   * locked if that terminal was waiting for the host after an AID.
+   */
+  resume(waitingForHost: boolean): void {
+    this.#update(() => {
+      this.#inhibit = waitingForHost ? 'wait' : undefined;
+      this.#operatorError = undefined;
+      this.#insertMode = false;
+    });
+  }
+
   disconnected(): void {
     this.#update(() => {
       this.#inhibit = 'notConnected';
