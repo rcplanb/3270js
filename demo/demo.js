@@ -67,7 +67,18 @@ function disconnect() {
   session.term.disconnect();
 }
 
+/**
+ * The settings a session is negotiated with. They are locked while connected:
+ * changing one then would do nothing until the next connection, and the page
+ * would show a terminal that isn't the one the host was told about.
+ */
+const SESSION_SETTINGS = ['target', 'codepage', 'model', 'lu', 'color', 'blankfill'];
+function lockSettings(locked) {
+  for (const id of SESSION_SETTINGS) $(id).disabled = locked;
+}
+
 function teardown() {
+  lockSettings(false);
   session?.mapper.dispose();
   session = undefined;
   $('connect').textContent = 'Connect';
@@ -123,6 +134,7 @@ async function connect() {
   );
 
   $('connect').textContent = 'Disconnect';
+  lockSettings(true);
   $('trace').disabled = false;
   status(`Connecting to ${$('target').value}${luName ? `, LU ${luName}` : ''}…`);
   try {
