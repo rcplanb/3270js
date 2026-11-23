@@ -289,7 +289,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
 
   - **The server is in charge of the ID; the visitor sees every screen.**
     - The browser never holds a password.
-    - The relay fills the password itself: it writes one record to the host, on the same connection, between the browser's records.
+    - The relay fills the password itself: at the password prompt the browser presses Enter with nothing typed, and the relay adds the password field to that record on its way to the host. Inserting a record of its own would duplicate TN3270E sequence numbers and leave the browser's keyboard state wrong.
     - When the browser goes, the relay takes over the session, logs it off, and only then releases the ID.
   - **Passwords:**
     - They live in a file named by `TN3270_POOL_FILE`, outside the repository, mode 600. The server refuses a file anyone else can read.
@@ -309,7 +309,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
 
   - **Logon button** (shown once the logon screen is up):
     - It types `LOGON <id>` through the visitor's terminal, as the Docent does, and presses Enter.
-    - At the password prompt, if the prompt names the session's own ID (`ENTER CURRENT PASSWORD FOR MUSE03`), the relay fills the hidden field with the password and sends Enter. The browser shows "Logging on…" and keeps its keyboard locked until the host answers.
+    - At the password prompt, if the prompt names the session's own ID (`ENTER CURRENT PASSWORD FOR MUSE03`), the relay asks the browser to press Enter (a Docent-style action) and adds the password field to that record. The browser shows "Logging on…"; its keyboard is locked by its own Enter until the host answers.
     - The visitor watches the broadcast messages and `***` into ISPF. TK5's logon procedure goes there; `=X` gives `READY`.
     - Typing `LOGON MUSE03` by hand works the same way.
   - **The guard**, in the relay, before anything is forwarded to the host:
@@ -321,7 +321,7 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
   - **Clean endings.** The page closes, the connection drops, the visitor clicks Disconnect, the session sits idle (default 15 minutes without a key), or the server shuts down. In each case:
     1. The relay keeps the host connection open and turns its observer copy into a server-side 3270js `Terminal` on that connection.
     2. It runs the same steps a person would, with the 3270js TSO helpers:
-       - At a password prompt, PA1.
+       - At a password prompt, PA1, then `LOGOFF` at TSO's `LOGON` re-prompt. PA1 alone doesn't cancel a logon on TK5; this sequence does, with no password (checked live 2026-11-24).
        - In an editor, `CANCEL`, never saving a visitor's half-finished edit.
        - In ISPF, F3 or `=X`.
        - At `***`, Enter.
@@ -340,9 +340,9 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
   **Tasks**
 
   - [ ] **14a. 3270js: act on a session from the server** (minor release, 0.3.0)
-    - `SessionObserver.encodeInput({ aid, cursor, fields })` returns the wire bytes of a terminal record: TN3270E header, Read Modified layout, IAC doubling, EOR. It is fed back through the observer and recorder like any terminal record, so its password field is redacted in the trace.
-    - `adoptTerminal(observer, transport, options)` makes a `Terminal` that starts from the observer's state: negotiation, TN3270E functions and BIND, screen and fields, cursor, keyboard lock. It continues the session on an existing connection without renegotiating, so `Session`, `tsoLogoff` and `toIspfPrimary` run unchanged.
-    - `tsoLogoff` handles a password prompt (PA1) and a pending reconnect.
+    - `encodeInbound({ aid, cursor, fields }, size)`, the inverse of `parseInbound`, and a standalone `frameRecord(body, header?)`: TN3270E header, IAC doubling, EOR. They let the relay rebuild the browser's Enter record with the password field added. The rebuilt record goes through the observer and recorder like any terminal record, so the password is redacted in the trace.
+    - `Terminal.adopt(observer, transport, options)` makes a `Terminal` that starts from the observer's state: negotiation, TN3270E functions, BIND and sequence numbers, screen and fields, cursor, keyboard lock, reply mode. It continues the session on an existing connection without renegotiating, so `Session`, `tsoLogoff` and `toIspfPrimary` run unchanged.
+    - `tsoLogoff` cancels a logon left at the password prompt (PA1, then `LOGOFF`).
     - Acceptance:
       - Unit tests: encoded records match `Terminal`'s own for the same input.
       - An adopted terminal continues a recorded TK5 trace, at ISPF, at READY and at the password prompt, to a logoff.
