@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 (2026-11-23)
+
+- **Typed input lands where it was typed.** Read Modified drops a field's
+  nulls, so text typed after empty cells (TSO line mode: the command goes on
+  the line below `READY`, in a field that starts just after it) came back at
+  the field's start, on the `READY` line. `applyInbound` now places it just
+  before the cursor the record carries, when it fits there and the cells
+  before it are empty on the screen.
+
 ## 0.2.0 (2026-11-23)
 
 - **Replays show what the operator typed** (#60). A 3270 keeps typed input on

@@ -150,10 +150,12 @@ describe('traceToCommands', () => {
     expect(pairs[1]!.before.text.join('\n')).not.toMatch(/\*{4}/);
     const ispf = pairs.find((p) => p.input.some((i) => i.text === '=X'))!;
     expect(ispf.before.text.join('\n')).toMatch(/Option\s+===> =X/);
-    // A command typed after READY shares its line, and it is still READY.
+    // At READY the command is typed on the next line, as the terminal showed it
+    // (Read Modified drops the nulls before it; the cursor says where it was).
     const logoff = pairs.find((p) => p.input.some((i) => i.text === 'LOGOFF'))!;
     expect(logoff.before.kind).toBe('tso-ready');
-    expect(logoff.before.text[0]).toMatch(/READY\s+LOGOFF/);
+    expect(logoff.before.text[0]!.trim()).toBe('READY');
+    expect(logoff.before.text[1]!.trim()).toBe('LOGOFF');
   });
 });
 
