@@ -64,6 +64,20 @@ describe('TracePlayer', () => {
     );
   });
 
+  it('shows what the operator typed, until the host writes over it (#60)', () => {
+    const player = new TracePlayer(loadTrace('tk5/tso-logon'));
+    // Walk the timeline: at some moment the logon screen shows the typed userid,
+    // and the password never shows at all.
+    const seen: string[] = [];
+    for (let t = 0; t <= player.duration + 0.01; t += 0.01) {
+      player.seek(t);
+      seen.push(player.terminal.text.join('\n'));
+    }
+    expect(seen.some((s) => /Logon ===> HERC01/.test(s))).toBe(true);
+    expect(seen.some((s) => /Logon ===>\s*$/m.test(s))).toBe(true); // before it was typed
+    expect(seen.every((s) => !/\*{6}/.test(s))).toBe(true);
+  });
+
   it('rejects something that is not a trace', () => {
     expect(() => new TracePlayer({ format: 'x' } as never)).toThrow(/not a 3270js trace/);
   });
