@@ -8,7 +8,7 @@ export {
   Tn3270eReason,
   Tn3270eResponseFlag,
 } from './constants.js';
-export { createTelnetSession } from './telnet.js';
+export { createTelnetSession, frameRecord } from './telnet.js';
 export type {
   TelnetEvent,
   TelnetSession,

@@ -76,12 +76,26 @@ export async function toIspfPrimary(s: Session, limit = 8): Promise<void> {
   }
 }
 
-/** Leave ISPF (=X, PF3 as a fallback) to READY, then LOGOFF, back to the logon screen. */
+/**
+ * Leave ISPF (=X, PF3 as a fallback) to READY, then LOGOFF, back to the logon
+ * screen.
+ *
+ * From a password prompt it cancels the logon: PA1 interrupts it, TSO asks
+ * for a LOGON command again, and LOGOFF there ends it (checked on TK5; PA1
+ * alone doesn't). Never just disconnect at a password prompt: MVS keeps the
+ * user ID until VTAM deactivates the terminal.
+ */
 export async function tsoLogoff(s: Session, limit = 8): Promise<void> {
   if (s.term.keyboard.isLocked) s.term.press({ type: 'reset' });
   for (let i = 0; i < limit && !READY.test(s.screen); i++) {
     const kind = recognise(s.term).kind;
     if (kind === 'vtam-logon') return; // already off
+    if (kind === 'password') {
+      await s.press('PA1', /^\s*LOGON\s*$/m);
+      s.type('LOGOFF');
+      await s.press('ENTER', 'vtam-logon');
+      return;
+    }
     if (kind === 'more') await s.press('ENTER');
     else if (EDITOR.test(s.screen)) await s.command('CANCEL');
     else if (i < 3) await s.command('=X');

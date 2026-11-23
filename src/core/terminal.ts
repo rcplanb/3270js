@@ -40,6 +40,7 @@ import {
   type TelnetSession,
   type Tn3270eHeader,
 } from './telnet/index.js';
+import type { SessionObserver } from './observer/index.js';
 import type { Transport } from './transport.js';
 
 export interface TerminalOptions {
@@ -168,6 +169,55 @@ export class Terminal {
     this.#geometry = { default: DEFAULT_GEOMETRY, alternate: MODELS[this.model] };
     this.screen = new Screen(DEFAULT_GEOMETRY.rows, DEFAULT_GEOMETRY.cols);
     this.keyboard = new Keyboard(this.screen, options.keyboard);
+    this.#refresh(false);
+  }
+
+  /**
+   * Take over a session that a SessionObserver has been following, on the
+   * same connection, without negotiating again: the screen, the fields, the
+   * cursor, the keyboard lock and the TN3270E state carry on where the
+   * observed terminal left them. The transport must carry the same
+   * connection (its host side), and the observed terminal must be gone: from
+   * here on this Terminal is the only one sending.
+   *
+   * A server uses it to finish a session its user has left, e.g. to log off.
+   * `options` default to the observer's model, colour and code page.
+   */
+  static adopt(
+    observer: SessionObserver,
+    transport: Transport,
+    options: TerminalOptions = {},
+  ): Terminal {
+    const term = new Terminal({
+      model: observer.model,
+      color: observer.color,
+      codePage: observer.codePage,
+      ...options,
+    });
+    term.#adopt(observer, transport);
+    return term;
+  }
+
+  #adopt(observer: SessionObserver, transport: Transport): void {
+    const state = observer.session;
+    this.#transport = transport;
+    this.#telnet = createTelnetSession({
+      terminalType: this.terminalType,
+      resume: state.tn3270e ? { tn3270e: state.tn3270e } : {},
+    });
+    this.screen.copyFrom(observer.screen);
+    this.#session = state.tn3270e;
+    this.#seq = state.nextSeq;
+    this.#mode = state.mode;
+    this.#bind = state.bindImage ? parseBind(state.bindImage, this.codePage) : undefined;
+    this.#sscpStart = this.screen.cursor;
+    this.#lastAid = state.lastAid;
+    this.#setReply(state.reply);
+    this.keyboard.resume(state.keyboardLocked);
+    this.#unsubscribe = [
+      transport.onData((d) => this.#receive(d)),
+      transport.onClose((reason) => this.#closed(reason)),
+    ];
     this.#refresh(false);
   }
 

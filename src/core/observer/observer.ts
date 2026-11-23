@@ -17,8 +17,14 @@
 import { type CodePage, getCodePage } from '../codepage/index.js';
 import { type OutboundGeometry, processOutbound } from '../datastream/index.js';
 import { Emitter } from '../events.js';
-import { Aid, type InboundRecord, applyInbound, parseInbound } from '../inbound/index.js';
-import { StructuredFieldId, parseStructuredFields } from '../query/index.js';
+import {
+  Aid,
+  type InboundRecord,
+  type ReplyModeState,
+  applyInbound,
+  parseInbound,
+} from '../inbound/index.js';
+import { ReplyModeCode, StructuredFieldId, parseStructuredFields } from '../query/index.js';
 import { MODELS, type ModelNumber, Screen } from '../screen/index.js';
 import { writeSscpLu } from '../sscp.js';
 import { TelnetFramer } from '../trace/framer.js';
@@ -56,6 +62,26 @@ export interface ObservedItem {
 
 export type ObservedMode = 'unbound' | 'lu-lu' | 'sscp-lu' | 'nvt';
 
+/**
+ * What a Terminal needs to continue an observed session on the same
+ * connection (Terminal.adopt), besides the screen.
+ */
+export interface ObservedSession {
+  /** The TN3270E session, if one was negotiated; plain TN3270 otherwise. */
+  tn3270e?: { deviceType: string; luName?: string; functions: number[] };
+  /** The current BIND image (TN3270E with BIND-IMAGE), without its header. */
+  bindImage?: Uint8Array;
+  mode: ObservedMode;
+  /** The sequence number for the terminal's next 3270-DATA record (TN3270E). */
+  nextSeq: number;
+  /** Waiting for the host after an AID: the keyboard is locked. */
+  keyboardLocked: boolean;
+  /** The host's reply mode (Set Reply Mode). */
+  reply: ReplyModeState;
+  /** The AID of the operator's last key, for reads the host makes later. */
+  lastAid: number;
+}
+
 export interface SessionObserverEvents {
   /** The host wrote to the screen (any write, including SSCP-LU text). */
   hostWrite: undefined;
@@ -74,6 +100,8 @@ const TELOPT_TN3270E = 40;
 const OP_FUNCTIONS = 0x03;
 const OP_IS = 0x04;
 const FN_BIND_IMAGE = 0x00;
+const OP_DEVICE_TYPE = 0x02;
+const OP_CONNECT = 0x01;
 const DT = { DATA_3270: 0x00, BIND_IMAGE: 0x03, UNBIND: 0x04, SSCP_LU_DATA: 0x07 } as const;
 const DEFAULT_GEOMETRY = { rows: 24, cols: 80 };
 /** AIDs on replies the host asked for, not operator input. */
@@ -82,6 +110,8 @@ const HOST_REQUESTED = new Set<number>([Aid.NONE, Aid.QUERY_REPLY, Aid.STRUCTURE
 export class SessionObserver {
   readonly screen: Screen;
   readonly codePage: CodePage;
+  readonly model: ModelNumber;
+  readonly color: boolean;
   readonly #events = new Emitter<SessionObserverEvents>();
   readonly #geometry: OutboundGeometry;
   readonly #color: boolean;
@@ -91,6 +121,12 @@ export class SessionObserver {
   #tn3270e = false;
   #functions = new Set<number>();
   #bound = false;
+  #bindImage: Uint8Array | undefined;
+  #deviceType = '';
+  #luName: string | undefined;
+  #nextSeq = 0;
+  #reply: ReplyModeState = { mode: 'field' };
+  #lastAid: number = Aid.NONE;
   #mode: ObservedMode = 'unbound';
   #locked = true;
   #awaitingFirst = true;
@@ -106,6 +142,8 @@ export class SessionObserver {
     this.codePage = cp;
     this.#geometry = { default: DEFAULT_GEOMETRY, alternate: MODELS[model] };
     this.#color = options.color ?? false;
+    this.model = model;
+    this.color = this.#color;
     this.#quietMs = options.quietMs ?? 300;
     this.#timers = options.timers;
     this.screen = new Screen(DEFAULT_GEOMETRY.rows, DEFAULT_GEOMETRY.cols);
@@ -167,6 +205,27 @@ export class SessionObserver {
     });
   }
 
+  /** The session state a Terminal needs to take this session over (Terminal.adopt). */
+  get session(): ObservedSession {
+    return {
+      ...(this.#tn3270e
+        ? {
+            tn3270e: {
+              deviceType: this.#deviceType,
+              ...(this.#luName === undefined ? {} : { luName: this.#luName }),
+              functions: [...this.#functions],
+            },
+          }
+        : {}),
+      ...(this.#bindImage ? { bindImage: this.#bindImage } : {}),
+      mode: this.sessionMode,
+      nextSeq: this.#nextSeq,
+      keyboardLocked: this.#locked,
+      reply: this.#reply,
+      lastAid: this.#lastAid,
+    };
+  }
+
   /** Stop the quiet timer. */
   dispose(): void {
     this.#timers?.clearTimeout(this.#quiet);
@@ -182,6 +241,13 @@ export class SessionObserver {
     } else if (verb === SB && bytes[3] === OP_FUNCTIONS && bytes[4] === OP_IS) {
       // FUNCTIONS IS <list> IAC SE, from either side, settles the functions.
       this.#functions = new Set(bytes.subarray(5, bytes.length - 2));
+    } else if (verb === SB && bytes[3] === OP_DEVICE_TYPE && bytes[4] === OP_IS) {
+      // DEVICE-TYPE IS <type> [CONNECT <lu>] IAC SE, from the host.
+      const body = bytes.subarray(5, bytes.length - 2);
+      const connect = body.indexOf(OP_CONNECT);
+      const text = (b: Uint8Array) => String.fromCharCode(...b);
+      this.#deviceType = text(connect < 0 ? body : body.subarray(0, connect));
+      this.#luName = connect < 0 ? undefined : text(body.subarray(connect + 1));
     }
   }
 
@@ -192,10 +258,12 @@ export class SessionObserver {
       const type = record[0];
       if (type === DT.BIND_IMAGE) {
         this.#bound = true;
+        this.#bindImage = record.slice(5);
         return;
       }
       if (type === DT.UNBIND) {
         this.#bound = false;
+        this.#bindImage = undefined;
         this.#mode = 'unbound';
         this.screen.resize(DEFAULT_GEOMETRY.rows, DEFAULT_GEOMETRY.cols);
         this.screen.clear();
@@ -203,6 +271,7 @@ export class SessionObserver {
       }
       if (type === DT.SSCP_LU_DATA) {
         this.#mode = 'sscp-lu';
+        this.#lastAid = Aid.NONE;
         this.screen.cursor = writeSscpLu(this.screen, record.subarray(5), this.screen.cursor);
         this.#hostWrote(true);
         return;
@@ -221,9 +290,19 @@ export class SessionObserver {
     const r = processOutbound(this.screen, data, this.#geometry, { color: this.#color });
     const isWrite =
       r.command === 'W' || r.command === 'EW' || r.command === 'EWA' || r.command === 'EAU';
+    // An Erase/Write with the WCC reset bit returns to field reply mode (as Terminal).
+    if (r.wccReset && (r.command === 'EW' || r.command === 'EWA')) this.#reply = { mode: 'field' };
     if (isWrite) this.#hostWrote(r.keyboardRestore);
     if (!r.structuredFields) return;
     for (const f of parseStructuredFields(r.structuredFields).fields) {
+      if (f.id === StructuredFieldId.SET_REPLY_MODE && f.data[0] === 0x00) {
+        // As Terminal: field, extended-field or character mode (with its attribute types).
+        const type = f.data[1];
+        if (type === ReplyModeCode.FIELD) this.#reply = { mode: 'field' };
+        else if (type === ReplyModeCode.EXTENDED_FIELD) this.#reply = { mode: 'extendedField' };
+        else if (type === ReplyModeCode.CHARACTER)
+          this.#reply = { mode: 'character', attributes: [...f.data.subarray(2)] };
+      }
       if (f.id === StructuredFieldId.OUTBOUND_3270DS && f.data[0] === 0x00) {
         const inner = processOutbound(this.screen, f.data.subarray(1), this.#geometry, {
           color: this.#color,
@@ -253,6 +332,8 @@ export class SessionObserver {
     if (this.#tn3270e) {
       if (record.length < 5 || record[0] !== DT.DATA_3270) return record;
       header = record.subarray(0, 5);
+      // RFC 2355 §10.4: the terminal counts its 3270-DATA records.
+      this.#nextSeq = ((((record[3]! << 8) | record[4]!) & 0x7fff) + 1) % 32768;
       body = record.subarray(5);
     }
     const redacted = redactInbound(body, this.screen.size, (a) => this.isHidden(a));
@@ -261,6 +342,7 @@ export class SessionObserver {
     // the host asked for (Query Reply, Read Partition, no-AID reads) don't.
     if (parsed.errors.length === 0 && !HOST_REQUESTED.has(parsed.aid)) {
       this.#locked = true;
+      this.#lastAid = parsed.aid;
       this.#timers?.clearTimeout(this.#quiet);
       // The terminal's screen still shows what was typed: keep it on the copy
       // too (displayed fields only; the record is already redacted).
