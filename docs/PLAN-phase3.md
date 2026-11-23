@@ -283,14 +283,98 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
 
 - [ ] **14. Sessions and user IDs: a pool, a Logon button, and clean endings**
   - Why: visitors close the page, lose their connection or reload, and MVS keeps whatever they left: a TSO user stuck at the password prompt, or waiting to reconnect. And a TSO user ID can only be logged on once. (Twice on 2026-11-23 a dropped test left a stuck logon on TK5, cleared with VTAM `V NET,INACT,ID=CUU0Cn,I` then `ACT`.)
-  - Acceptance:
-    - **A pool of TSO user IDs per 3270 machine.** Passwords come from server secrets (never the database, git or the browser). A session is allocated one ID when it connects, and only that session has it. The ID goes back to the pool only once its logoff is confirmed; one that can't be confirmed is held for an admin, not handed out. With every ID in use, the page says the terminals are busy. Admin pages show which session holds which ID.
-    - **A Logon button.** The visitor still sees the real screens (the EBCDIC art is part of the charm): the button types `LOGON <id>` through the visitor's terminal, the server fills the hidden password field itself, and the visitor watches the broadcast messages and `***` through to `READY`, or into ISPF if they chose it.
-    - **Clean endings.** When the session ends (page closed, connection lost, Disconnect), the server takes over from its copy of the screen for a few seconds: PA1 or Clear at a logon or password prompt, PF3 out of ISPF, `LOGOFF` at `READY`, then confirms the logoff and releases the ID.
-    - **A guard:** a logon to any user ID other than the session's own is refused by the relay, with a notice (failed attempts can leave stuck sessions, or revoke an ID on OS/390).
-    - **3270js:** a way for the server to act from its observer (fill a field, press an AID) once it is in charge: logon, cleanup, and Docent actions with no browser. A minor release.
-  - Verify: unit tests for the pool and its leases; live on TK5, closing the page at each stage (logon screen, password prompt, `READY`, ISPF) leaves no TSO user (`D TS,L`) and returns the ID to the pool.
-  - Open: which IDs go into TK5's pool (HERC01 and HERC02 are the user's own), and whether to create more.
+  - **The pool on TK5:** MUSE01–MUSE05, created 2026-11-24 through 3270js: RAKF `SYS1.SECURE.CNTL(USERS)`, `/S RAKFUSER`, `SYS2.JCLLIB(ADDUSER)`. Each logs on to ISPF. TK5 has seven VTAM 3270 terminals (`CUU0C0`–`C6`), so five IDs leave two for the owner's HERC01 and HERC02.
+
+  **Design**
+
+  - **The server is in charge of the ID; the visitor sees every screen.**
+    - The browser never holds a password.
+    - The relay fills the password itself: it writes one record to the host, on the same connection, between the browser's records.
+    - When the browser goes, the relay takes over the session, logs it off, and only then releases the ID.
+  - **Passwords:**
+    - They live in a file named by `TN3270_POOL_FILE`, outside the repository, mode 600. The server refuses a file anyone else can read.
+    - The format is JSON: `{ "<machine id>": [{ "user": "MUSE01", "password": "…" }, …] }`.
+    - Passwords are not kept in the database or the machine record (its `terminal_json` refuses credentials already). They are never sent to the browser, never logged and never recorded: the trace holds asterisks, like any hidden field.
+    - Machines with no pool (the MP3000, where the owner does logons) work as today, with no Logon button and no guard.
+  - **Leases (SQLite `tn3270_leases`)**: one row per pool ID, with these states:
+
+    | State    | Meaning                                                                        |
+    | -------- | ------------------------------------------------------------------------------ |
+    | `free`   | Can be handed out.                                                             |
+    | `leased` | Held by a session; the row records the session, the user and the time.         |
+    | `ending` | The relay is logging it off.                                                   |
+    | `held`   | The logoff couldn't be confirmed. Never handed out until an admin releases it. |
+    - The relay allocates an ID when the session connects. When every ID is leased, the page says all terminals are busy, before taking a terminal from the host.
+    - The admin page lists the leases. "Release" on a held ID is for after the admin has checked or cleared it on the host (`D TS,L`; INACT/ACT if needed).
+
+  - **Logon button** (shown once the logon screen is up):
+    - It types `LOGON <id>` through the visitor's terminal, as the Docent does, and presses Enter.
+    - At the password prompt, if the prompt names the session's own ID (`ENTER CURRENT PASSWORD FOR MUSE03`), the relay fills the hidden field with the password and sends Enter. The browser shows "Logging on…" and keeps its keyboard locked until the host answers.
+    - The visitor watches the broadcast messages and `***` into ISPF. TK5's logon procedure goes there; `=X` gives `READY`.
+    - Typing `LOGON MUSE03` by hand works the same way.
+  - **The guard**, in the relay, before anything is forwarded to the host:
+    - At the logon screen, any word plus Enter starts a TSO logon, so only `LOGON <own id>`, `<own id>` or an empty Enter pass. `LOGON <id> RECONNECT` doesn't pass either: it belongs to the relay's recovery.
+    - At `READY` and in ISPF option 6, a `LOGON` command for another ID is refused.
+    - At a password prompt, only PA1 (cancel) passes from the visitor. The password is the relay's job.
+    - A refused record is not sent. The browser gets a notice and its keyboard is reset, so it is not left waiting for a host reply that will never come.
+    - The Docent acts through the browser's records, so the guard covers it too.
+  - **Clean endings.** The page closes, the connection drops, the visitor clicks Disconnect, the session sits idle (default 15 minutes without a key), or the server shuts down. In each case:
+    1. The relay keeps the host connection open and turns its observer copy into a server-side 3270js `Terminal` on that connection.
+    2. It runs the same steps a person would, with the 3270js TSO helpers:
+       - At a password prompt, PA1.
+       - In an editor, `CANCEL`, never saving a visitor's half-finished edit.
+       - In ISPF, F3 or `=X`.
+       - At `***`, Enter.
+       - At `READY`, `LOGOFF`.
+    3. It waits for the logon screen, with an overall limit of about 30 seconds.
+    4. If that screen comes back, the ID is free. If not, it is held, logged and shown to admins.
+    - A visitor who reloads gets a new session, and the old one is logged off in the background.
+  - **After a crash or restart** (no chance to log off), a recovery sweep runs at startup for every ID left `leased` or `ending`:
+    1. It opens a fresh connection and logs on.
+    2. "In use" means the session is waiting for reconnect: it reconnects and logs off.
+    3. If the logon goes through normally, it logs off.
+    4. Anything else marks the ID held.
+    - This is the `reconnect-logoff` sequence that cleared HERC03 on 2026-11-23.
+    - A logon left at the password prompt can't be cleared from a terminal (it needs VTAM INACT/ACT). The sweep marks it held and says so.
+
+  **Tasks**
+
+  - [ ] **14a. 3270js: act on a session from the server** (minor release, 0.3.0)
+    - `SessionObserver.encodeInput({ aid, cursor, fields })` returns the wire bytes of a terminal record: TN3270E header, Read Modified layout, IAC doubling, EOR. It is fed back through the observer and recorder like any terminal record, so its password field is redacted in the trace.
+    - `adoptTerminal(observer, transport, options)` makes a `Terminal` that starts from the observer's state: negotiation, TN3270E functions and BIND, screen and fields, cursor, keyboard lock. It continues the session on an existing connection without renegotiating, so `Session`, `tsoLogoff` and `toIspfPrimary` run unchanged.
+    - `tsoLogoff` handles a password prompt (PA1) and a pending reconnect.
+    - Acceptance:
+      - Unit tests: encoded records match `Terminal`'s own for the same input.
+      - An adopted terminal continues a recorded TK5 trace, at ISPF, at READY and at the password prompt, to a logoff.
+      - Equivalence: the observer and an adopted terminal agree on every recorded trace.
+  - [ ] **14b. SimH: the pool and its leases**
+    - `TN3270_POOL_FILE` loading and checks (permissions, unknown machines, duplicate IDs).
+    - The `tn3270_leases` table and the lease state machine.
+    - Allocation at connect, and the "all terminals busy" page.
+    - Admin listing and release.
+    - Acceptance: unit tests for allocation, release, `held`, concurrent connects, and a pool file change (a removed ID is retired when it is next freed).
+  - [ ] **14c. SimH: Logon button, password fill and guard**
+    - The relay forwards on record boundaries (the observer frames them), so its own record never lands inside one of the browser's.
+    - The guard rules above.
+    - The password fill, only for the session's own ID and only at its prompt.
+    - The Logon button and "Logging on…" state in `index.html`.
+    - Acceptance: relay tests for every guard case, including the Docent. A recorded session holds no password: the trace, cast, MP4 and `session_commands` are searched for each pool password.
+  - [ ] **14d. SimH: clean endings and recovery**
+    - Takeover on close, idle and shutdown (bounded, all sessions in parallel at shutdown).
+    - The startup sweep.
+    - `held` with an admin notice.
+    - Acceptance: tests with a scripted host, ending at each stage.
+  - [ ] **14e. Live on TK5**
+    - Close the page at the logon screen, at the password prompt (the visitor typed `LOGON` by hand and left), at `***`, in ISPF, in the editor with changes, and at READY.
+    - Kill the server mid-session, then restart it.
+    - Each time, `D TS,L` lists no MUSE ID afterwards, and the lease is `free`.
+    - Every ID busy gives the busy page.
+    - A guard refusal leaves the terminal usable.
+
+  - Open:
+    - Should a visitor choose ISPF or READY at Logon, or always land in ISPF (TK5's procedure)? Proposed: always ISPF; the Docent explains `=X`.
+    - Idle limit: proposed 15 minutes, with a warning at 13.
+    - Should signed-in museum staff bypass the pool (log on as their own IDs, no guard), as on the MP3000? Proposed: admins only, per machine.
 
 ### Recordings as a feature (after Phase 3)
 
