@@ -4,17 +4,20 @@
  * It never sends anything. Like a 3174 establishment controller watching its
  * terminal, it keeps the screen as the host wrote it, knows which fields are
  * hidden, follows the keyboard lock as the host sees it, and parses what the
- * terminal sends, with passwords redacted.
+ * terminal sends, with passwords redacted. What the operator sent is put back
+ * on the screen (applyInbound), as the terminal still showed it; what has
+ * been typed but not sent exists only in the terminal.
  *
  * It follows the same session logic as Terminal: telnet and TN3270E
  * negotiation (RFC 2355), FUNCTIONS, BIND and UNBIND, SSCP-LU text, Outbound
  * 3270DS structured fields and Erase/Write Alternate. Its screen matches a
- * Terminal fed the same host bytes (checked on every recorded trace).
+ * Terminal fed the same host bytes plus the same input put back (checked on
+ * every recorded trace).
  */
 import { type CodePage, getCodePage } from '../codepage/index.js';
 import { type OutboundGeometry, processOutbound } from '../datastream/index.js';
 import { Emitter } from '../events.js';
-import { Aid, type InboundRecord, parseInbound } from '../inbound/index.js';
+import { Aid, type InboundRecord, applyInbound, parseInbound } from '../inbound/index.js';
 import { StructuredFieldId, parseStructuredFields } from '../query/index.js';
 import { MODELS, type ModelNumber, Screen } from '../screen/index.js';
 import { writeSscpLu } from '../sscp.js';
@@ -259,6 +262,9 @@ export class SessionObserver {
     if (parsed.errors.length === 0 && !HOST_REQUESTED.has(parsed.aid)) {
       this.#locked = true;
       this.#timers?.clearTimeout(this.#quiet);
+      // The terminal's screen still shows what was typed: keep it on the copy
+      // too (displayed fields only; the record is already redacted).
+      applyInbound(this.screen, parsed);
       this.#events.emit('input', parsed);
     }
     if (!header) return redacted;

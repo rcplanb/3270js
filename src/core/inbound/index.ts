@@ -4,3 +4,4 @@ export { readBuffer, readModified } from './read.js';
 export type { ReadModifiedOptions, ReplyMode, ReplyModeState } from './read.js';
 export { parseInbound } from './parse.js';
 export type { InboundField, InboundRecord } from './parse.js';
+export { applyInbound, isOperatorInput } from './apply.js';

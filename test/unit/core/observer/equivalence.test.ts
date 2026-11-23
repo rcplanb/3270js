@@ -1,10 +1,13 @@
 /**
  * The observer's screen must match a Terminal fed the same host bytes, after
  * every host record of every recorded trace: TK5 (monochrome, colour, models
- * 2-5), OS/390 2.10 over TN3270E, and the synthetic outlining screen.
+ * 2-5), OS/390 2.10 over TN3270E, and the synthetic outlining screen. What
+ * the operator sent is put back on both (applyInbound), as the recording
+ * terminal's own screen showed it.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { applyInbound, parseInbound } from '../../../../src/core/inbound/index.js';
 import { SessionObserver } from '../../../../src/core/observer/index.js';
 import type { Screen } from '../../../../src/core/screen/index.js';
 import { Terminal } from '../../../../src/core/terminal.js';
@@ -44,6 +47,11 @@ describe('SessionObserver matches Terminal on every recorded trace', () => {
       const chunk = Uint8Array.from(Buffer.from(bytes, 'hex'));
       if (e.dir === 'terminal') {
         observer.terminal(chunk);
+        if (e.kind === 'record') {
+          const record = Buffer.from(e.hex, 'hex');
+          const body = term.tn3270e ? (record[0] === 0 ? record.subarray(5) : undefined) : record;
+          if (body?.length) applyInbound(term.screen, parseInbound(body, term.screen.size));
+        }
         continue;
       }
       observer.host(chunk);

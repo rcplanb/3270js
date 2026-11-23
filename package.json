@@ -1,6 +1,6 @@
 {
   "name": "3270js",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "TN3270/TN3270E terminal emulator library for the browser and Node: an xterm.js analogue for IBM 3270",
   "license": "MIT",

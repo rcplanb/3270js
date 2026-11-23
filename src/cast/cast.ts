@@ -35,7 +35,15 @@ const AID_NAMES = new Map<number, string>(
 function replay(
   trace: Trace,
   o: SessionObserver,
-  on: (e: { t: number; dir: 'host' | 'terminal'; data: Uint8Array; wrote: boolean }) => void,
+  on: (e: {
+    t: number;
+    dir: 'host' | 'terminal';
+    data: Uint8Array;
+    /** The host wrote to the screen. */
+    wrote: boolean;
+    /** The screen changed (a host write, or the operator's input put back on it). */
+    changed: boolean;
+  }) => void,
 ): void {
   let wrote = false;
   const off = o.on('hostWrite', () => (wrote = true));
@@ -44,10 +52,12 @@ function replay(
     // Records are stored unframed: frame them again for the observer.
     const chunk = e.kind === 'record' ? frame(bytes) : bytes;
     wrote = false;
+    const version = o.screen.version;
     const items = e.dir === 'host' ? o.host(chunk) : o.terminal(chunk);
     if (e.kind !== 'record') continue;
+    const changed = o.screen.version !== version;
     for (const item of items) {
-      if (item.kind === 'record') on({ t: e.t, dir: e.dir, data: item.data, wrote });
+      if (item.kind === 'record') on({ t: e.t, dir: e.dir, data: item.data, wrote, changed });
     }
   }
   off();
@@ -158,7 +168,7 @@ export function traceToCast(trace: Trace, options: CastOptions = {}): string {
   const lines = [JSON.stringify(header)];
   const o = observerFor(trace);
   let rows = 0;
-  replay(trace, o, ({ t, dir, data, wrote }) => {
+  replay(trace, o, ({ t, dir, data, wrote, changed }) => {
     const time = Math.round(t) / 1000;
     if (dir === 'host' && wrote) {
       // A change of screen size: clear once so nothing of the old screen remains.
@@ -166,6 +176,8 @@ export function traceToCast(trace: Trace, options: CastOptions = {}): string {
       rows = o.screen.rows;
       lines.push(JSON.stringify([time, 'o', clear + paint(o, theme, mode, height)]));
     } else if (dir === 'terminal') {
+      // What the operator typed, as the screen showed it when the key was pressed.
+      if (changed) lines.push(JSON.stringify([time, 'o', paint(o, theme, mode, height)]));
       const text = describeInput(o, data);
       if (text) lines.push(JSON.stringify([time, 'i', text]));
     }

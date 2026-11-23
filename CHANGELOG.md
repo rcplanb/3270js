@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.0 (2026-11-23)
+
+- **Replays show what the operator typed** (#60). A 3270 keeps typed input on
+  the screen until the host writes over it; copies built from the host's
+  records showed blanks there. Now:
+  - `applyInbound(screen, record)` (new) puts a terminal record's field data
+    back on a screen: unprotected, displayed fields only, so password fields
+    stay blank. `isOperatorInput(record)` tells an operator's key from a reply
+    the host asked for.
+  - `SessionObserver` applies it on every operator key, so its screen (and
+    `screenState`) shows what was sent, as the terminal did.
+  - `TracePlayer` shows typed input between the host's screens, with the
+    cursor where the operator left it.
+  - `traceToCast` paints a frame at each key, so casts and the MP4s made from
+    them show the command before the host's answer. `traceToCommands`'
+    `before` screens include it.
+- `recognise` still finds TSO `READY` when a command typed after it shares its
+  line.
+
 ## 0.1.1 (2026-11-23)
 
 - `WebSocketTransport` passes text messages to the embedder: `onText()` and

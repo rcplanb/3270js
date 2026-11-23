@@ -146,9 +146,30 @@ export function recognise(s: ScreenSource): Recognised {
       return result('ispf-panel', { commandField, ...(title ? { title } : {}) });
     }
   }
-  if (READY.test(all)) return result('tso-ready');
+  // READY is the host's: test it without what the operator is typing (in TSO
+  // line mode a command typed after READY shares its line).
+  if (READY.test(withoutTyping(s))) return result('tso-ready');
   if (/^\s*Hercules Version/m.test(all)) return result('hercules');
   return result('unknown');
+}
+
+/**
+ * The screen's text with the field the cursor is in blanked, when it is an
+ * input field: what the operator is typing. (Not every unprotected field: TSO
+ * line mode writes READY itself into one.)
+ */
+function withoutTyping(s: ScreenSource): string {
+  const { cols } = s.screen;
+  const rows = s.text.map((line) => [...line]);
+  const f = s.screen.isFormatted ? s.screen.fieldAt(s.screen.cursor) : undefined;
+  if (f && !f.protected) {
+    for (let i = 0; i < f.length; i++) {
+      const a = (f.dataStart + i) % s.screen.size;
+      const row = rows[Math.floor(a / cols)];
+      if (row && a % cols < row.length) row[a % cols] = ' ';
+    }
+  }
+  return rows.map((r) => r.join('')).join('\n');
 }
 
 /**

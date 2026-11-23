@@ -61,9 +61,14 @@ function framesOf(name: string) {
   );
   for (const e of trace.events) {
     const before = frames.length;
+    const version = o.screen.version;
     const b = e.kind === 'record' ? Buffer.from(frame(e.hex), 'hex') : fromHex(e.hex);
     if (e.dir === 'host') o.host(b);
     else o.terminal(b);
+    // The operator's input, put back on the screen, is a frame of its own.
+    if (e.dir === 'terminal' && e.kind === 'record' && o.screen.version !== version) {
+      frames.push({ text: [], cursor: -1, rows: 0, cols: 0 });
+    }
     if (frames.length > before) {
       frames[frames.length - 1] = {
         text: o.text.map((l) => l.trimEnd()),
@@ -135,5 +140,36 @@ describe('traceToCommands', () => {
       kind: 'ispf-panel',
       title: 'RFE DSLIST',
     });
+  });
+
+  it('shows what was typed on the "before" screen, as the terminal did (#60)', () => {
+    const pairs = traceToCommands(loadTrace('tk5/tso-logon'));
+    expect(pairs[0]!.before.text.join('\n')).toMatch(/Logon ===> HERC01/);
+    // The password field is non-display: nothing of it on the screen.
+    expect(pairs[1]!.before.kind).toBe('password');
+    expect(pairs[1]!.before.text.join('\n')).not.toMatch(/\*{4}/);
+    const ispf = pairs.find((p) => p.input.some((i) => i.text === '=X'))!;
+    expect(ispf.before.text.join('\n')).toMatch(/Option\s+===> =X/);
+    // A command typed after READY shares its line, and it is still READY.
+    const logoff = pairs.find((p) => p.input.some((i) => i.text === 'LOGOFF'))!;
+    expect(logoff.before.kind).toBe('tso-ready');
+    expect(logoff.before.text[0]).toMatch(/READY\s+LOGOFF/);
+  });
+});
+
+describe('traceToCast: typed input (#60)', () => {
+  it('paints the typed command before the host answers it', () => {
+    const lines = traceToCast(loadTrace('tk5/tso-logon')).trimEnd().split('\n');
+    const header = JSON.parse(lines[0]!) as { width: number; height: number };
+    const events = lines.slice(1).map((l) => JSON.parse(l) as [number, string, string]);
+    const vt = new Vt(header.width, header.height);
+    const firstInput = events.findIndex((e) => e[1] === 'i');
+    // The frame just before the first "i" is the typed input; before it, the bare logon screen.
+    for (const e of events.slice(0, firstInput - 1)) if (e[1] === 'o') vt.write(e[2]);
+    expect(vt.line(22)).not.toMatch(/HERC01/);
+    const before = events[firstInput - 1]!;
+    expect(before[1]).toBe('o');
+    vt.write(before[2]);
+    expect(vt.line(22)).toMatch(/Logon ===> HERC01/);
   });
 });

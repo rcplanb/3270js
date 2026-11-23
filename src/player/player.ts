@@ -9,6 +9,7 @@
  * new terminal. Not part of the platform-neutral core: it uses timers.
  */
 import { Emitter } from '../core/events.js';
+import { applyInbound, parseInbound } from '../core/inbound/index.js';
 import { Terminal } from '../core/terminal.js';
 import { type Trace, fromHex } from '../core/trace/index.js';
 import type { Transport } from '../core/transport.js';
@@ -40,8 +41,10 @@ interface Step {
   /** Seconds on the player's timeline (idle limit applied). */
   time: number;
   bytes: Uint8Array;
-  /** Index of this host record among the records, or -1 for telnet commands. */
+  /** Index of this host record among the records, or -1 for telnet commands and input. */
   frame: number;
+  /** The operator's input (a terminal record): put back on the screen, not sent anywhere. */
+  input?: boolean;
 }
 
 const IAC = 0xff;
@@ -101,17 +104,23 @@ export class TracePlayer {
     this.#view = options.view;
     this.#speed = options.speed ?? 1;
     const idle = options.idleLimit ?? 3;
-    // Only the host's side is played: the terminal's replies don't change what the host sent.
+    // The host's side is played into the terminal. Of the terminal's side,
+    // only the operator's input matters: what was typed stays on the screen
+    // until the host writes over it, as it did on the real terminal.
     let time = 0;
     let last = 0;
     let frame = 0;
     this.#steps = [];
     for (const e of trace.events) {
-      if (e.dir !== 'host') continue;
+      if (e.dir !== 'host' && e.kind !== 'record') continue;
       const t = e.t / 1000;
       time += Math.min(Math.max(0, t - last), idle);
       last = t;
       const bytes = fromHex(e.hex);
+      if (e.dir !== 'host') {
+        this.#steps.push({ time, bytes, frame: -1, input: true });
+        continue;
+      }
       const isRecord = e.kind === 'record';
       this.#steps.push({
         time,
@@ -233,11 +242,28 @@ export class TracePlayer {
 
   #step(): void {
     const s = this.#steps[this.#next++]!;
+    if (s.input) {
+      this.#showInput(s.bytes);
+      return;
+    }
     this.#transport.deliver(s.bytes);
     if (s.frame >= 0) {
       this.#frame = s.frame;
       this.#events.emit('frame', { frame: s.frame, time: s.time });
     }
+  }
+
+  /** Put the operator's input (a recorded terminal record) on the screen. */
+  #showInput(record: Uint8Array): void {
+    const term = this.#terminal;
+    let body = record;
+    if (term.tn3270e) {
+      if (record[0] !== 0x00) return; // TN3270E: only 3270-DATA carries input
+      body = record.subarray(5);
+    }
+    if (body.length === 0) return;
+    const parsed = parseInbound(body, term.screen.size);
+    if (applyInbound(term.screen, parsed)) term.moveCursor(term.screen.cursor); // repaint
   }
 
   #schedule(): void {
