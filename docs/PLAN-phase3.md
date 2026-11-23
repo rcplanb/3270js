@@ -208,7 +208,7 @@ Each task is one PR.
     - Tests: unit tests with fake timers (play, pause, speed, seek back and forward, idle limit); e2e in three browsers × two renderers (play to the end, then seek by content), with screenshot baselines.
     - Video: the cast from task 4 also goes through SimH Assist's `agg` → `ffmpeg` pipeline to MP4 (checked on the colour ISPF tour).
 
-- [ ] **6. Release v0.1.0 for SimH Assist**
+- [x] **6. Release v0.1.0 for SimH Assist**
   - Acceptance:
     - `npm pack` builds `3270js-0.1.0.tgz`, attached to a GitHub release `v0.1.0` (the repository stays private, and `package.json` keeps `private: true`, so nothing can reach npm by accident).
     - A `CHANGELOG.md` entry, and the README states how to install from the tarball.
@@ -217,13 +217,13 @@ Each task is one PR.
     - version `0.1.0`, `CHANGELOG.md`, and README install instructions
     - `npm run check:pack`, which packs the tarball, installs it into an empty CommonJS project and loads all 8 entry points with `require` and `import`, plus the fonts and a smoke test; it passes on Node 20.20.2 and 24.22.1
     - Found on the way: `3270js/node` needs `ws` even for `TcpTransport` (#56, documented)
-  - The tag and GitHub release follow once this is merged to `main`.
+  - Released 2026-11-22 (#57). **v0.1.1** (2026-11-23, #58) added `WebSocketTransport.onText()`/`sendText()`, so SimH Assist's page shares one WebSocket for bytes and control messages.
 
 ### simh-assist: the integration (→ Checkpoints I and J)
 
-SimH Assist **vendors the tarball** (`vendor/3270js-0.1.0.tgz`, `"3270js": "file:vendor/3270js-0.1.0.tgz"`), so its rsync deploys need no access to the private repository. Moving to npm later, once 3270js is public, is a one-line change.
+SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "file:vendor/3270js-0.1.1.tgz"`), so its rsync deploys need no access to the private repository. Moving to npm later, once 3270js is public, is a one-line change.
 
-- [ ] **7. A `tn3270-target` machine kind**
+- [x] **7. A `tn3270-target` machine kind** (simh-assist #38)
   - Acceptance:
     - A migration that rebuilds `machines` with `tn3270-target` added to its CHECK constraint.
     - Columns or JSON for model, colour, code page, LU name and TN3270E.
@@ -231,7 +231,7 @@ SimH Assist **vendors the tarball** (`vendor/3270js-0.1.0.tgz`, `"3270js": "file
     - `connection: 'tn3270'`.
   - Verify: `node --test` for the migration and registry; the admin API round-trips.
 
-- [ ] **8. Relay and observer on the server**
+- [x] **8. Relay and observer on the server** (simh-assist #39)
   - Acceptance:
     - A WebSocket handler for `tn3270` machines: binary frames relayed to the machine's host and port, using the machine record only (never an open relay).
     - A `SessionObserver` attached to every session.
@@ -239,7 +239,7 @@ SimH Assist **vendors the tarball** (`vendor/3270js-0.1.0.tgz`, `"3270js": "file
     - A JSON control channel for Docent actions and state.
   - Verify: an integration test with 3270js's scripted test host; live on TK5.
 
-- [ ] **9. The browser page**
+- [ ] **9. The browser page** (simh-assist #40, in review)
   - Acceptance:
     - `index.html` chooses the renderer by the machine's terminal type: xterm for the existing machines, and 3270js (DOM renderer, keyboard mapper, 3270 font, status line) for `tn3270`.
     - 3270js served from `node_modules` like xterm.
@@ -277,6 +277,19 @@ SimH Assist **vendors the tarball** (`vendor/3270js-0.1.0.tgz`, `"3270js": "file
     4. The recording, cast, MP4 and `session_commands` contain no password.
   - Also: README and docs in both repos.
   - Verify: the live run, then a museum demo checklist.
+
+### After Phase 3 acceptance
+
+- [ ] **14. Sessions and user IDs: a pool, a Logon button, and clean endings**
+  - Why: visitors close the page, lose their connection or reload, and MVS keeps whatever they left: a TSO user stuck at the password prompt, or waiting to reconnect. And a TSO user ID can only be logged on once. (Twice on 2026-11-23 a dropped test left a stuck logon on TK5, cleared with VTAM `V NET,INACT,ID=CUU0Cn,I` then `ACT`.)
+  - Acceptance:
+    - **A pool of TSO user IDs per 3270 machine.** Passwords come from server secrets (never the database, git or the browser). A session is allocated one ID when it connects, and only that session has it. The ID goes back to the pool only once its logoff is confirmed; one that can't be confirmed is held for an admin, not handed out. With every ID in use, the page says the terminals are busy. Admin pages show which session holds which ID.
+    - **A Logon button.** The visitor still sees the real screens (the EBCDIC art is part of the charm): the button types `LOGON <id>` through the visitor's terminal, the server fills the hidden password field itself, and the visitor watches the broadcast messages and `***` through to `READY`, or into ISPF if they chose it.
+    - **Clean endings.** When the session ends (page closed, connection lost, Disconnect), the server takes over from its copy of the screen for a few seconds: PA1 or Clear at a logon or password prompt, PF3 out of ISPF, `LOGOFF` at `READY`, then confirms the logoff and releases the ID.
+    - **A guard:** a logon to any user ID other than the session's own is refused by the relay, with a notice (failed attempts can leave stuck sessions, or revoke an ID on OS/390).
+    - **3270js:** a way for the server to act from its observer (fill a field, press an AID) once it is in charge: logon, cleanup, and Docent actions with no browser. A minor release.
+  - Verify: unit tests for the pool and its leases; live on TK5, closing the page at each stage (logon screen, password prompt, `READY`, ISPF) leaves no TSO user (`D TS,L`) and returns the ID to the pool.
+  - Open: which IDs go into TK5's pool (HERC01 and HERC02 are the user's own), and whether to create more.
 
 ### Infrastructure (in parallel)
 
