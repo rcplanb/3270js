@@ -371,10 +371,10 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     - Every ID busy gives the busy page.
     - A guard refusal leaves the terminal usable.
 
-  - Open:
-    - Should a visitor choose ISPF or READY at Logon, or always land in ISPF (TK5's procedure)? Proposed: always ISPF; the Docent explains `=X`.
-    - Idle limit: proposed 15 minutes, with a warning at 13.
-    - Should signed-in museum staff bypass the pool (log on as their own IDs, no guard), as on the MP3000? Proposed: admins only, per machine.
+  - Decided (2026-11-24):
+    - **Logon always lands in ISPF.** People who know MVS know `=X` for TSO. Everyone else is better off on a menu than at a bare `READY` with TSO's command syntax.
+    - **Idle limit: 15 minutes, with a warning at 13.**
+    - **Pool bypass is for admins only, set per machine.** Signed-in admins can log on with their own IDs, with no pool and no guard, on machines that allow it. TK5: yes, for HERC01 and HERC02. The MP3000 has no pool at all.
 
 ### Recordings as a feature (after Phase 3)
 
