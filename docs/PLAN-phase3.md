@@ -364,6 +364,35 @@ SimH Assist **vendors the tarball** (now `vendor/3270js-0.1.1.tgz`, `"3270js": "
     - The startup sweep.
     - `held` with an admin notice.
     - Acceptance: tests with a scripted host, ending at each stage.
+  - [ ] **14f. The console ladder, on systems SimH Assist manages** (decided 2026-11-24)
+    - Why: an in-session logoff can fail. Seen live: a session left in a TSO line-mode prompt (`INVALID DATA SET NAME … REENTER -`), where `=X` and PF3 are taken as answers; and a logon dropped at the password prompt after a crash. An operator would cancel the user from the MVS console, so the server should too, where it can.
+    - **Managed and unmanaged systems:**
+      - A _managed_ system is one SimH Assist runs itself, under Hercules: TK5 now, later an OS/390 ADCD instance and a VM instance. Its pool entry names a console, `"console": { "type": "hercules-http", "url": "…" }`, in the pool file, not the database.
+      - Real systems run by others, like the MP3000, are _unmanaged_: no console. Known limit: there, the ladder stops at the in-session logoff, and anything else is held for an admin.
+    - **The ladder**, when the in-session logoff (14d) doesn't bring back the logon screen, or the startup sweep can't recover an ID:
+      1. `D TS,L`: if the ID isn't listed, it's free.
+      2. `C U=<id>` (`CANCEL`; MVS 3.8j has no `FORCE`, which came with MVS/SP). Then confirm with `D TS,L` again.
+      3. Still listed: it's a logon stuck at the password prompt, which `CANCEL` doesn't clear. The relay notes the session's VTAM terminal from the logon screen (`Terminal CUU0C1` on TK5) and keeps it with the lease. The ladder checks:
+         - `D NET,ID=<terminal>,E` shows it allocated to TSO
+         - the Hercules device has no client (`devlist`)
+
+         Then it runs `V NET,INACT,ID=<terminal>,I` and `V NET,ACT,ID=<terminal>`, and confirms with `D TS,L`.
+
+      4. Anything else: held for an admin, with the console's answers in the note.
+    - **Narrow by design.** The Hercules HTTP console takes any command with no authentication, so the server's console module only issues:
+      - `D TS,L`
+      - `C U=` for that machine's own pool IDs
+      - `D NET` of a terminal, and `INACT`/`ACT` of the one terminal it has just confirmed belongs to the stuck pool ID
+      - `devlist` of that one device
+
+      It never issues a free-form command. Every command and its result go to the audit log.
+
+    - **Later:**
+      - VM (CP `FORCE userid`) gets its own console type.
+      - OS/390 under Hercules uses the same Hercules console (and has `FORCE` if `CANCEL` fails).
+      - A 3270 console LU through 3270js could serve systems without a Hercules console.
+    - Acceptance: unit tests with a scripted console (each rung, and the refusals: another ID, a terminal not allocated to TSO, a device in use). Live on TK5: a session left at `REENTER -` and a crash at the password prompt both end with the ID free and `D TS,L` empty.
+
   - [ ] **14e. Live on TK5**
     - Close the page at the logon screen, at the password prompt (the visitor typed `LOGON` by hand and left), at `***`, in ISPF, in the editor with changes, and at READY.
     - Kill the server mid-session, then restart it.
