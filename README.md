@@ -6,7 +6,8 @@ TypeScript, an [xterm.js](https://xtermjs.org/) analogue for IBM mainframes.
 ![ISPF on MVS 3.8j TK5 in 3270js](docs/screenshots/demo-ispf-color.png)
 
 **Status:** v0.3.0 (2026-11-24): Phases 1 to 3 complete. 3270js runs IBM
-mainframe sessions in [SimH Assist](https://github.com/rcplanb/simh-assist).
+mainframe sessions in SimH Assist, the museum's internal project for running
+historic systems in the browser (not public).
 Not yet published to npm; see Install. See [SPEC.md](SPEC.md),
 [docs/PLAN.md](docs/PLAN.md) (Phase 1),
 [docs/PLAN-phase2.md](docs/PLAN-phase2.md) (Phase 2) and
