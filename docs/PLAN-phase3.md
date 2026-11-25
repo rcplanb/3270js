@@ -416,9 +416,9 @@ No other TN3270 client we know of renders a session to its own faithful player, 
 
 ### Infrastructure (in parallel)
 
-- [ ] **13. OS/390 (ADCD) under Hercules**
+- [x] **13. OS/390 (ADCD) under Hercules** (IPLed 2026-11-25; TSO logon through its TN3270E server works in c3270 and SimH Assist staging. The setup moved to the SimH Assist repository, `infra/hercules-os390`, as it is the museum's system rather than part of the library.)
   - Acceptance:
-    - A container on gpu-server running OS/390 from the museum's ADCD, alongside TK5, with its own `infra/hercules-os390/` (Dockerfile, compose and README).
+    - A container on gpu-server running OS/390 from the museum's ADCD, alongside TK5, with its own Dockerfile, compose and README.
     - **The ADCD volumes are licensed:** they're never committed, and they live in a bind mount under `/home` (the root filesystem is small). The user provides them and confirms that the licence covers this use.
     - TN3270 through Hercules' 3270 port, plus OS/390's own TCP/IP and **TN3270E server** through a container network interface (LCS or CTC), so TN3270E can be tested on our own hardware, not only on the Multiprise.
     - A SimH Assist machine for it.
