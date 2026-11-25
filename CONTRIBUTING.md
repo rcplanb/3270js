@@ -2,6 +2,10 @@
 
 Thank you for helping. Issues and pull requests are welcome.
 
+3270js is maintained by one person, in a time zone that may not match yours,
+so replies to issues and pull requests can take a few days. Every pull request
+waits for the maintainer's review before it is merged.
+
 ## Setting up
 
 Node 20 or later (`.nvmrc` has the version used for development).
