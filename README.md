@@ -231,16 +231,30 @@ Found while putting TK5 sessions into SimH Assist:
 
 ## Roadmap
 
-- **Phase 3 (done):** SimH Assist integration: a passive server-side copy
-  of the session, the Docent filling in fields, password-safe recording,
-  and replay in both players and as MP4.
-- **Next** ([docs/PLAN-phase3.md](docs/PLAN-phase3.md)): OS/390 ADCD under
-  Hercules; a pool of TSO user IDs with a Logon button and clean endings;
-  recordings as a feature of their own (rendering from the command line,
-  captions and chapters, scripted demos, an embeddable replay page).
+This is the library's roadmap. How SimH Assist uses 3270js (its user ID pools,
+its machines, its consoles) is on SimH Assist's own roadmap.
+
+- **Done (Phases 1 to 3, v0.3.0):** the terminal, TN3270 and TN3270E, the
+  extended data stream, both renderers, the transports and the proxy,
+  scripting with the TSO helpers, and everything an application needs to
+  sit beside a session: an observer that follows a session it doesn't own,
+  programmatic actions (fill fields, press an AID), `Terminal.adopt` to take
+  a session over from the server, password-redacted traces, `.cast` export
+  and the `TracePlayer`. SimH Assist was the first application built on them.
+- **Next:**
+  - **Publish to npm**, then settle the API for a 1.0.
+  - **Recordings as a feature of their own:** render a trace or a scripted
+    session to `.cast` or MP4 from the command line; captions and chapter
+    marks from the keys and screens already in a trace; scripted, repeatable
+    demos; an embeddable replay page.
+- **In progress:** a TN3270E test host of our own, OS/390's TN3270E server
+  under Hercules, so TN3270E is tested without depending on someone else's
+  machine.
 - **Phase 4 (far future): graphics (GDDM).** Programmed symbols, vector
   graphics and image display; needs a host with GDDM.
 - **Phase 5 (far future): file transfer (IND$FILE).** DFT and CUT modes.
+- **Out of scope for now:** printer sessions (LU1/LU3/SCS), DBCS and the
+  light pen.
 
 ## License
 
