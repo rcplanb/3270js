@@ -106,7 +106,7 @@ Send and receive files with the host's `IND$FILE` program, as x3270 and IBM's em
 
 ### Out of scope (for now)
 
-Printer sessions (LU1/LU3/SCS), DBCS, light pen, and the SimH Assist rename. Graphics have moved to Phase 4, and file transfer to Phase 5.
+Printer sessions (LU1/LU3/SCS), DBCS and the light pen. Graphics have moved to Phase 4, and file transfer to Phase 5. (The SimH Assist rename, once listed here, is SimH Assist's question, on its own roadmap.)
 
 ## 3. Architecture
 
