@@ -3,8 +3,8 @@
 These drive a real TN3270 host and never run in `npm test`.
 
 ```sh
-HERCULES_HOST=100.113.55.17 TSO_USER=HERC03 TSO_PASSWORD=... npm run test:live
-HERCULES_HOST=100.113.55.17 TSO_USER=HERC03 TSO_PASSWORD=... npm run test:e2e:live   # browser acceptance
+HERCULES_HOST=<hercules-host> TSO_USER=HERC03 TSO_PASSWORD=... npm run test:live
+HERCULES_HOST=<hercules-host> TSO_USER=HERC03 TSO_PASSWORD=... npm run test:e2e:live   # browser acceptance
 ```
 
 | Variable        | Default    |                                                                                                           |
