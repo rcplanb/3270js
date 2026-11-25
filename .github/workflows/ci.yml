@@ -1,0 +1,38 @@
+name: CI
+
+# Runs on every pull request (including from forks) and on pushes to main.
+# Needs no secrets. The live tests (a real Hercules host) and the browser
+# tests (screenshots made on macOS) are not run here.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # s3270 is the reference the differential tests compare against; they
+      # skip with a warning if it is missing, so a failed install is not fatal.
+      - name: Install s3270
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq s3270 || echo "s3270 not installed; differential tests will skip"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run check:traces
+      - run: npm run check:exports
+      - run: npm run check:pack

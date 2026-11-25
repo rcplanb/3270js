@@ -14,7 +14,7 @@ export interface ProxyTarget {
 }
 
 export interface WebSocketProxyOptions {
-  /** Named hosts clients may reach, e.g. `{ tk5: { host: '100.113.55.17', port: 3270 } }`. */
+  /** Named hosts clients may reach, e.g. `{ tk5: { host: 'hercules.example', port: 3270 } }`. */
   targets: Record<string, ProxyTarget>;
   /** Listen on this port (use 0 for any). Ignored when `server` is given. */
   port?: number;
