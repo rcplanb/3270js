@@ -22,6 +22,10 @@ if [[ -n "${OS390_IP:-}" ]]; then
     sleep 1
   done
   if ip link show "${OS390_TUN:-tap0}" >/dev/null 2>&1; then
+    # Hercules would configure the host end with hercifc, which is not
+    # installed: do it here (the container has NET_ADMIN).
+    ip addr replace "${OS390_HOST_CIDR:-10.1.1.1/24}" dev "${OS390_TUN:-tap0}"
+    ip link set "${OS390_TUN:-tap0}" up
     iptables -t nat -A PREROUTING -p tcp --dport 2323 -j DNAT --to-destination "${OS390_IP}:${OS390_TN3270_PORT:-23}"
     iptables -t nat -A POSTROUTING -o "${OS390_TUN:-tap0}" -j MASQUERADE
     echo "NAT: container :2323 -> ${OS390_IP}:${OS390_TN3270_PORT:-23}" >> "logs/hercules-$(date +%Y%m%d).log"

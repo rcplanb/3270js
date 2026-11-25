@@ -1,12 +1,12 @@
 #**********************************************************************
-#  OS/390 (ADCD) on SDL Hyperion 4.9.1: Hercules configuration template
+#  OS/390 2.10 (ADCD, Dec 2000) on SDL Hyperion 4.9.1: Hercules config
 #
-#  prepare-os390.sh copies this to os390/conf/os390.cnf. Lines marked
-#  @ADCD@ depend on the ADCD release: take them from the ADCD's own
-#  documentation (its readme or "system guide" lists the volumes, their
-#  device addresses, the IPL address and LOADPARM, and the terminal and
-#  console addresses its IODF defines). Don't guess them: a wrong device
-#  address or LOADPARM just gives a wait state.
+#  prepare-os390.sh copies this to os390/conf/os390.cnf. It is filled in
+#  for the OS/390 R10 ADCD and IPLed on 2026-11-25. For another ADCD
+#  release, take the volumes, their device addresses, the IPL address and
+#  LOADPARM, and the terminal and console addresses from that release's
+#  device map and documentation. Don't guess them: a wrong device address
+#  or LOADPARM just gives a wait state.
 #**********************************************************************
 
 MODPATH     hercules/lib/hercules   # Hercules' device modules (LCS, 3270, ...)
@@ -17,7 +17,7 @@ CPUMODEL    7060                    # Multiprise 3000, like the museum's own
 CPUSERIAL   000390
 LPARNAME    OS390
 NUMCPU      2
-MAINSIZE    512                     # MB; @ADCD@ check the minimum it asks for
+MAINSIZE    512                     # MB: enough for the ADCD
 TZOFFSET    +0000
 OSTAILOR    OS/390
 DIAG8CMD    DISABLE                 # the guest can't issue Hercules commands
@@ -31,31 +31,61 @@ HTTP        ROOT hercules/httproot
 HTTP        START
 
 # ── IPL ──────────────────────────────────────────────────────────────
-# @ADCD@ the IPL volume's address and the LOADPARM (IODF suffix + nucleus):
-# IPL       0A80
-# LOADPARM  0A82xxM1
+# From the ADCD's own device map (DEVMAP.MVS, OS/390 R10 AD, Dec 2000):
+# ipl 0A80, loadparm 0A82CS (IODF on 0A82 = OS39M1, LOADCS), ESA mode.
+# No IPL statement: SDL Hercules runs commands found in the config, so an
+# IPL here would start OS/390 unattended. IPL by hand: "ipl 0a80".
+LOADPARM    0A82CS
+PGMPRDOS    LICENSED                # OS/390 under the ADCD licence (non-commercial)
 
 # ── 3270 terminals and the MVS master console ────────────────────────
-# @ADCD@ the addresses the IODF defines for local non-SNA 3270s. Typically
-# one is the master console (group CONS, so a client can ask for it by LU)
-# and the rest are VTAM terminals for TSO.
-# 0700      3270  CONS
-# 0701-070F 3270
+# The P/390 device map: 0700 is the operator console (/R=OP); 0701, 0702,
+# 0900 and 0901 are local TSO terminals, 0902-0903 "LAN TSO", 0713-0715 for
+# IMS. CONSOL00 also makes 0908 a master console. The consoles are in group
+# CONS, so only a client that asks for CONS gets one (as on TK5); visitors
+# get a TSO terminal.
+0700        3270  CONS
+0908        3270  CONS
+0701        3270
+0702        3270
+0900-0903   3270
+0713-0715   3270
 
 # ── DASD (the licensed ADCD volumes, in os390/dasd) ──────────────────
-# @ADCD@ one line per volume: address, device type, file. Compressed
-# (CCKD) images work as they are; Hercules creates shadow files if asked.
-# 0A80      3390  dasd/<IPL volume, e.g. OS39RA>.cckd
-# 0A81      3390  dasd/<next volume>.cckd
+# Hercules CKD as they come (header CKD_P370). A volume split in two is
+# named <vol>_1.<addr> and <vol>_2.<addr>: Hercules opens the _1 file and
+# finds the rest itself.
+# dasd/ holds the volumes as downloaded and is never run from. dasd-run/
+# holds copy-on-write (XFS reflink) copies that OS/390 writes to; to start
+# again from the ADCD as shipped, recreate them (seconds, no extra space).
+0A80        3390  dasd-run/os39ra_1.a80
+0A81        3390  dasd-run/os3raa_1.a81
+0A82        3390  dasd-run/os39m1_1.a82
+0A83        3390  dasd-run/os39pa.a83
+0A84        3390  dasd-run/os3paa.a84
+0A85        3390  dasd-run/os39da_1.a85
+0A86        3390  dasd-run/os3daa_1.a86
+0A87        3390  dasd-run/os39ha.a87
+0A88        3390  dasd-run/os3dab.a88
+0A89        3390  dasd-run/os3pab.a89
+0A8A        3390  dasd-run/os3pac_1.a8a
+0A8B        3390  dasd-run/os3pad_1.a8b
+
+# ── Unit record and tape (from the device map) ───────────────────────
+000C        3505  rdr/dummy.jcl eof ascii trunc
+000E        1403  prt/prt00e.txt crlf
+000F        1403  prt/prt00f.txt crlf
+0580        3420  *
+0581        3420  *
 
 # ── OS/390's own TCP/IP (and its TN3270E server) ─────────────────────
-# @ADCD@ the adapter its TCPIP PROFILE uses: an LCS (OSA) pair or a CTC pair.
 # The guest's address goes in compose (.env OS390_IP); the entrypoint NATs
-# the container's port 2323 to its TN3270E server. Check the statement's
-# options against Hercules' LCS/CTCI documentation for 4.9 before use.
-# LCS:   0E20.2 LCS -n /dev/net/tun -a 10.1.1.1 10.1.1.2
-# CTCI:  0E40.2 CTCI -n /dev/net/tun 10.1.1.2 10.1.1.1
+# the container's port 2323 to its TN3270E server.
+# The ADCD IODF has 0E20-0E21 as the LCS (3088 CTC, CHPID 0E). Hercules makes
+# it a TAP interface, tap0, in the container; the entrypoint gives the
+# container's end 10.1.1.1/24 (hercifc is not installed, so Hercules can't).
+# OS/390 is 10.1.1.2 (TCPIP.PROFILE.TCPIP on OS39M1: LCS1/ETH1; see README).
+0E20.2      LCS   -n /dev/net/tun 10.1.1.2
 
 # ── Printers, readers ────────────────────────────────────────────────
-# @ADCD@ if its JES2 needs them; output to os390/prt.
-# 000E      1403  prt/prt00e.txt crlf
+# Output goes to os390/prt.
