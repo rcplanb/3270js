@@ -1,3 +1,0 @@
-# Everything on the server lives in ./os390 (licensed DASD, logs): never commit it.
-os390/
-.env
